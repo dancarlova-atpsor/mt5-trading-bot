@@ -18,6 +18,7 @@ from strategies.mean_reversion import MeanReversion
 from strategies.scalping import Scalping
 from utils.logger import setup_logger
 from utils.helpers import load_config, is_trading_hours, pips_to_price
+from utils.notifier import TelegramNotifier
 
 logger = setup_logger("main", config_path="config/settings.yaml")
 
@@ -87,6 +88,7 @@ def main():
     data_fetcher = DataFetcher()
     order_manager = OrderManager()
     risk_manager = RiskManager()
+    notifier = TelegramNotifier()
 
     # Signal Bridge (comunicare cu MQL5 EA)
     exec_config = settings.get("execution", {})
@@ -100,7 +102,10 @@ def main():
     # Conectare MT5
     if not connector.connect():
         logger.error("Nu m-am putut conecta la MT5. Iesire.")
+        notifier.notify_error("Nu m-am putut conecta la MT5!")
         sys.exit(1)
+
+    notifier.notify_bot_started()
 
     # Incarca strategii
     strategies = load_strategies(strategies_config, settings.get("active_strategies", []))
@@ -119,6 +124,7 @@ def main():
     timezone_str = schedule.get("timezone", "Europe/Bucharest")
 
     outside_hours_logged = False
+    daily_report_sent = False
 
     try:
         while running:
@@ -128,9 +134,21 @@ def main():
                     if not outside_hours_logged:
                         logger.info(f"In afara orelor de trading ({trading_hours}). Astept...")
                         outside_hours_logged = True
+
+                        # Trimite raport zilnic la sfarsitul orelor de trading
+                        if not daily_report_sent:
+                            daily = risk_manager.get_daily_stats()
+                            acc = connector.get_account_info() or {}
+                            daily["balance"] = acc.get("balance", 0)
+                            daily["equity"] = acc.get("equity", 0)
+                            daily["open_positions"] = len(order_manager.get_open_positions())
+                            notifier.notify_daily_report(daily)
+                            daily_report_sent = True
+
                     time.sleep(interval)
                     continue
                 outside_hours_logged = False
+                daily_report_sent = False
 
                 # Informatii cont
                 account_info = connector.get_account_info()
@@ -240,6 +258,9 @@ def main():
                         if executed:
                             risk_manager.record_trade(0)  # PnL real se actualizeaza la inchidere
                             open_positions = order_manager.get_open_positions()
+                            notifier.notify_trade_opened(
+                                symbol, direction, volume, current_price, sl, tp, strategy.name
+                            )
 
                 # Trailing stop pe pozitii existente
                 for pos in open_positions:
@@ -260,10 +281,12 @@ def main():
 
             except Exception as e:
                 logger.error(f"Eroare in loop: {e}", exc_info=True)
+                notifier.notify_error(str(e))
 
             time.sleep(interval)
 
     finally:
+        notifier.notify_bot_stopped()
         connector.disconnect()
         logger.info("=" * 50)
         logger.info("Trading Bot MT5 — Stop")
