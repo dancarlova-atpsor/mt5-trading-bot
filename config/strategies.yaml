@@ -25,6 +25,27 @@ mean_reversion:
   bb_std_dev: 2.0
   volume_confirm: true      # Confirmare volum
 
+breakout:
+  enabled: true
+  timeframe: "H1"
+  symbols: ["EURUSD.cfd", "GBPUSD.cfd", "XAUUSD.cfd", "XAGUSD.cfd"]
+  lookback_period: 20           # Ultimele N bare pt range high/low
+  atr_period: 14
+  min_atr_ratio: 0.8            # ATR minim vs media (piata activa)
+  min_vol_ratio: 1.2            # Volum minim vs media (confirmare breakout)
+
+macd_divergence:
+  enabled: true
+  timeframe: "H1"
+  symbols: ["EURUSD.cfd", "GBPUSD.cfd", "XAUUSD.cfd", "XAGUSD.cfd"]
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+  rsi_period: 14
+  rsi_oversold: 40              # RSI sub 40 confirma divergenta bullish
+  rsi_overbought: 60            # RSI peste 60 confirma divergenta bearish
+  divergence_lookback: 30       # Bare pt cautare divergente
+
 news_sentiment:
   enabled: true
   timeframe: "H1"

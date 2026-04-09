@@ -17,6 +17,8 @@ from strategies.trend_following import TrendFollowing
 from strategies.mean_reversion import MeanReversion
 from strategies.scalping import Scalping
 from strategies.news_strategy import NewsSentiment
+from strategies.breakout import Breakout
+from strategies.macd_divergence import MACDDivergence
 from utils.logger import setup_logger
 from utils.helpers import load_config, is_trading_hours, pips_to_price
 from utils.notifier import TelegramNotifier
@@ -42,6 +44,8 @@ def load_strategies(strategies_config: dict, active_list: list) -> list[dict]:
         "mean_reversion": MeanReversion,
         "scalping": Scalping,
         "news_sentiment": NewsSentiment,
+        "breakout": Breakout,
+        "macd_divergence": MACDDivergence,
     }
 
     loaded = []

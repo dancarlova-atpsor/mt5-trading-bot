@@ -18,9 +18,11 @@ symbols:
 
 active_strategies:
   - trend_following
-  - mean_reversion
   - news_sentiment
-  # - scalping              # Decomenteaza cand esti gata
+  - breakout
+  - macd_divergence
+  # - mean_reversion        # Dezactivat — pierde pe piata actuala
+  # - scalping
 
 execution:
   mode: "python_api"          # "python_api" | "mql5_ea" | "both"
