@@ -4,9 +4,9 @@
 
 position_sizing:
   method: "percent_risk"    # "fixed_lot" sau "percent_risk"
-  risk_per_trade: 1.0       # % din cont per tranzactie
+  risk_per_trade: 0.5       # % din cont per tranzactie (0.5% = conservator)
   fixed_lot: 0.01           # Lot fix (daca method = fixed_lot)
-  max_lot: 1.0              # Lot maxim permis
+  max_lot: 0.1              # Lot maxim permis (safety cap)
 
 stop_loss:
   default_pips: 50
@@ -25,8 +25,8 @@ trailing_stop:
   trail_pips: 15            # Distanta de trailing
 
 limits:
-  max_open_positions: 5
-  max_positions_per_symbol: 2
-  max_daily_loss_percent: 3.0    # Opreste botul daca pierde X% azi
-  max_daily_trades: 20
+  max_open_positions: 4
+  max_positions_per_symbol: 1     # Doar 1 pozitie per simbol (evita stacking)
+  max_daily_loss_percent: 2.0    # Opreste botul daca pierde 2% azi
+  max_daily_trades: 10
   max_correlation_exposure: 3    # Max pozitii pe perechi corelate

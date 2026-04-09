@@ -198,6 +198,15 @@ def main():
                         if signal_result == Signal.HOLD:
                             continue
 
+                        # Evita duplicate: nu deschide aceeasi directie pe acelasi simbol
+                        direction_str = signal_result.value
+                        already_open = any(
+                            p["symbol"] == symbol and p["type"] == direction_str
+                            for p in open_positions
+                        )
+                        if already_open:
+                            continue
+
                         # Verificare risk
                         can_trade, reason = risk_manager.can_open_trade(
                             symbol, open_positions, account_info["balance"]
