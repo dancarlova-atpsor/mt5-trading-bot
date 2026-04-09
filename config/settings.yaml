@@ -1,0 +1,32 @@
+# ============================================
+# Trading Bot MT5 — Configurari Generale
+# ============================================
+
+account:
+  number: 12345678          # Numarul contului MT5
+  password: ""              # Se seteaza din env var MT5_PASSWORD
+  server: "BrokerDemo-Server"
+  mode: "demo"              # "demo" sau "real"
+  magic_number: 123456      # ID unic pentru ordinele botului
+
+symbols:
+  - EURUSD
+  - GBPUSD
+  - XAUUSD
+  - US500
+
+active_strategies:
+  - trend_following
+  - mean_reversion
+  # - scalping              # Decomenteaza cand esti gata
+
+schedule:
+  check_interval_seconds: 10
+  trading_hours: "08:00-22:00"
+  timezone: "Europe/Bucharest"
+
+logging:
+  level: "INFO"             # DEBUG, INFO, WARNING, ERROR
+  file: "logs/trading_bot.log"
+  max_size_mb: 10
+  backup_count: 5

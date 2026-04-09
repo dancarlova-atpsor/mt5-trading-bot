@@ -1,0 +1,32 @@
+# ============================================
+# Risk Management
+# ============================================
+
+position_sizing:
+  method: "percent_risk"    # "fixed_lot" sau "percent_risk"
+  risk_per_trade: 1.0       # % din cont per tranzactie
+  fixed_lot: 0.01           # Lot fix (daca method = fixed_lot)
+  max_lot: 1.0              # Lot maxim permis
+
+stop_loss:
+  default_pips: 50
+  use_atr: true             # SL bazat pe ATR
+  atr_multiplier: 1.5
+  atr_period: 14
+
+take_profit:
+  risk_reward_ratio: 2.0    # TP = SL * ratio
+  use_atr: true
+  atr_multiplier: 3.0
+
+trailing_stop:
+  enabled: true
+  activation_pips: 30       # Se activeaza dupa X pips profit
+  trail_pips: 15            # Distanta de trailing
+
+limits:
+  max_open_positions: 5
+  max_positions_per_symbol: 2
+  max_daily_loss_percent: 3.0    # Opreste botul daca pierde X% azi
+  max_daily_trades: 20
+  max_correlation_exposure: 3    # Max pozitii pe perechi corelate
