@@ -1,57 +1,88 @@
 # ============================================
 # Parametri per Strategie
+# Fiecare strategie ruleaza DOAR pe simbolurile pe care e profitabila (backtest)
 # ============================================
 
 trend_following:
   enabled: true
   timeframe: "H1"
-  symbols: ["EURUSD.cfd", "GBPUSD.cfd", "XAUUSD.cfd", "XAGUSD.cfd"]
+  # Profitabil pe: EURUSD(PF1.32), AUDUSD(PF1.32), CADJPY(PF1.32),
+  #                XAUUSD(PF1.19), XAGUSD(PF1.25), ETHUSD(PF1.26), EURGBP(PF1.12)
+  symbols:
+    - EURUSD.cfd
+    - AUDUSD.cfd
+    - CADJPY.cfd
+    - XAUUSD.cfd
+    - XAGUSD.cfd
+    - ETHUSD.cfd
+    - EURGBP.cfd
   ema_fast: 20
   ema_slow: 50
   macd_fast: 12
   macd_slow: 26
   macd_signal: 9
-  adx_threshold: 25        # ADX minim pentru trend puternic
+  adx_threshold: 25
   adx_period: 14
 
-mean_reversion:
+breakout:
   enabled: true
   timeframe: "H1"
-  symbols: ["EURUSD.cfd", "GBPUSD.cfd"]
+  # Profitabil pe: GBPUSD(PF1.13), AUDJPY(PF1.53), XAUUSD(PF1.23),
+  #                EURJPY(PF1.16), AUDUSD(PF1.14)
+  symbols:
+    - GBPUSD.cfd
+    - AUDJPY.cfd
+    - XAUUSD.cfd
+    - EURJPY.cfd
+    - AUDUSD.cfd
+  lookback_period: 20
+  atr_period: 14
+  min_atr_ratio: 0.8
+  min_vol_ratio: 1.2
+
+macd_divergence:
+  enabled: true
+  timeframe: "H1"
+  # Profitabil pe: USDJPY(PF3.80!), GBPJPY(PF2.20), BTCUSD(PF1.99),
+  #                ETHUSD(PF2.73), EURUSD(PF1.81), CADJPY(PF1.73), AUDUSD(PF1.50)
+  symbols:
+    - USDJPY.cfd
+    - GBPJPY.cfd
+    - BTCUSD.cfd
+    - ETHUSD.cfd
+    - EURUSD.cfd
+    - CADJPY.cfd
+    - AUDUSD.cfd
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+  rsi_period: 14
+  rsi_oversold: 40
+  rsi_overbought: 60
+  divergence_lookback: 30
+
+news_sentiment:
+  enabled: true
+  timeframe: "H1"
+  symbols:
+    - EURUSD.cfd
+    - GBPUSD.cfd
+    - XAUUSD.cfd
+    - XAGUSD.cfd
+    - BTCUSD.cfd
+    - ETHUSD.cfd
+  min_articles: 3
+  min_score: 0.3
+
+mean_reversion:
+  enabled: false              # Dezactivat — pierde pe piata actuala
+  timeframe: "H1"
+  symbols: ["EURUSD.cfd"]
   rsi_period: 14
   rsi_oversold: 30
   rsi_overbought: 70
   bb_period: 20
   bb_std_dev: 2.0
-  volume_confirm: true      # Confirmare volum
-
-breakout:
-  enabled: true
-  timeframe: "H1"
-  symbols: ["EURUSD.cfd", "GBPUSD.cfd", "XAUUSD.cfd", "XAGUSD.cfd"]
-  lookback_period: 20           # Ultimele N bare pt range high/low
-  atr_period: 14
-  min_atr_ratio: 0.8            # ATR minim vs media (piata activa)
-  min_vol_ratio: 1.2            # Volum minim vs media (confirmare breakout)
-
-macd_divergence:
-  enabled: true
-  timeframe: "H1"
-  symbols: ["EURUSD.cfd", "GBPUSD.cfd", "XAUUSD.cfd", "XAGUSD.cfd"]
-  macd_fast: 12
-  macd_slow: 26
-  macd_signal: 9
-  rsi_period: 14
-  rsi_oversold: 40              # RSI sub 40 confirma divergenta bullish
-  rsi_overbought: 60            # RSI peste 60 confirma divergenta bearish
-  divergence_lookback: 30       # Bare pt cautare divergente
-
-news_sentiment:
-  enabled: true
-  timeframe: "H1"
-  symbols: ["EURUSD.cfd", "GBPUSD.cfd", "XAUUSD.cfd", "XAGUSD.cfd"]
-  min_articles: 3               # Minim articole pt semnal
-  min_score: 0.3                # Scor minim sentiment
 
 scalping:
   enabled: false
@@ -62,5 +93,5 @@ scalping:
   stochastic_smooth: 3
   stochastic_oversold: 20
   stochastic_overbought: 80
-  max_spread_points: 15     # Spread maxim acceptat
+  max_spread_points: 15
   vwap_period: 20

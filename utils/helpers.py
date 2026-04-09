@@ -34,13 +34,21 @@ def is_trading_hours(trading_hours: str, timezone_str: str = "Europe/Bucharest")
 
 def pips_to_price(symbol: str, pips: float) -> float:
     """Converteste pips in diferenta de pret.
-    JPY pairs: 1 pip = 0.01, altele: 1 pip = 0.0001.
-    Aur (XAU): 1 pip = 0.01.
+    JPY pairs: 1 pip = 0.01
+    Metale (XAU/XAG): 1 pip = 0.01
+    Crypto (BTC/ETH/SOL): 1 pip = 1.0 (pret in USD intreg)
+    Forex standard: 1 pip = 0.0001
     """
     symbol_upper = symbol.upper()
     if "JPY" in symbol_upper:
         return pips * 0.01
     if "XAU" in symbol_upper or "XAG" in symbol_upper:
+        return pips * 0.01
+    if "BTC" in symbol_upper:
+        return pips * 1.0
+    if "ETH" in symbol_upper:
+        return pips * 0.1
+    if "SOL" in symbol_upper:
         return pips * 0.01
     return pips * 0.0001
 

@@ -10,11 +10,21 @@ account:
   magic_number: 123456      # ID unic pentru ordinele botului
 
 symbols:
+  # Forex
   - EURUSD.cfd
   - GBPUSD.cfd
+  - USDJPY.cfd
+  - AUDUSD.cfd
+  - CADJPY.cfd
+  - AUDJPY.cfd
+  - GBPJPY.cfd
+  - EURGBP.cfd
+  # Metale
   - XAUUSD.cfd
   - XAGUSD.cfd
-  - US500.cfd
+  # Crypto
+  - BTCUSD.cfd
+  - ETHUSD.cfd
 
 active_strategies:
   - trend_following
