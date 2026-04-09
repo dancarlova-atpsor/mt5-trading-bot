@@ -201,7 +201,7 @@ def main():
 
                         # Calcul SL, TP, volume
                         sl = risk_manager.calculate_stop_loss(data, direction, current_price, symbol)
-                        tp = risk_manager.calculate_take_profit(current_price, sl, direction)
+                        tp = risk_manager.calculate_take_profit(current_price, sl, direction, symbol)
                         sl_pips = abs(current_price - sl) / pips_to_price(symbol, 1)
                         volume = risk_manager.calculate_position_size(
                             account_info["balance"], sl_pips, symbol

@@ -117,7 +117,7 @@ class Backtester:
                     sl = self.risk_manager.calculate_stop_loss(
                         window, direction, entry_price, self.symbol
                     )
-                    tp = self.risk_manager.calculate_take_profit(entry_price, sl, direction)
+                    tp = self.risk_manager.calculate_take_profit(entry_price, sl, direction, self.symbol)
                     sl_pips = abs(entry_price - sl) / pip_price
                     volume = self.risk_manager.calculate_position_size(
                         self.balance, sl_pips, self.symbol

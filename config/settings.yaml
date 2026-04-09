@@ -3,17 +3,18 @@
 # ============================================
 
 account:
-  number: 12345678          # Numarul contului MT5
+  number: 9047351           # Cont demo Earn Broker
   password: ""              # Se seteaza din env var MT5_PASSWORD
-  server: "BrokerDemo-Server"
+  server: "EarnBroker-Sharp ECN"
   mode: "demo"              # "demo" sau "real"
   magic_number: 123456      # ID unic pentru ordinele botului
 
 symbols:
-  - EURUSD
-  - GBPUSD
-  - XAUUSD
-  - US500
+  - EURUSD.cfd
+  - GBPUSD.cfd
+  - XAUUSD.cfd
+  - XAGUSD.cfd
+  - US500.cfd
 
 active_strategies:
   - trend_following

@@ -127,7 +127,7 @@ if page == "📈 Status Live":
         # Coloreaza profitul
         st.dataframe(
             df_pos,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             column_config={
                 "Profit": st.column_config.NumberColumn(format="%.2f"),
@@ -171,7 +171,7 @@ elif page == "🔬 Backtesting":
     with col5:
         spread = st.number_input("Spread (pips)", value=1.0, step=0.5)
 
-    if st.button("Ruleaza Backtest", type="primary", use_container_width=True):
+    if st.button("Ruleaza Backtest", type="primary", width="stretch"):
         with st.spinner("Rulez backtestul..."):
             try:
                 from utils.helpers import load_config
@@ -279,7 +279,7 @@ elif page == "🔬 Backtesting":
                     xaxis_title="Bara",
                     yaxis_title="Capital",
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
                 # Tabel tranzactii
                 st.subheader("Detalii Tranzactii")
@@ -287,7 +287,7 @@ elif page == "🔬 Backtesting":
                     df_trades = pd.DataFrame(bt.trades)
                     st.dataframe(
                         df_trades,
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
 
@@ -306,7 +306,7 @@ elif page == "🔬 Backtesting":
                         xaxis_title="PnL",
                         yaxis_title="Frecventa",
                     )
-                    st.plotly_chart(fig_hist, use_container_width=True)
+                    st.plotly_chart(fig_hist, width="stretch")
 
             except Exception as e:
                 st.error(f"Eroare la backtest: {e}")
@@ -368,7 +368,7 @@ elif page == "📋 Istoric Tranzactii":
             m4.metric("W/L", f"{wins}/{losses}")
 
         # Tabel
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
 
         # Export
         csv_data = df.to_csv(index=False)

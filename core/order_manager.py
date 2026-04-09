@@ -62,6 +62,30 @@ class OrderManager:
 
         price = tick.ask if order_type == OrderType.MARKET_BUY else tick.bid
 
+        # Normalizeaza SL/TP la tick_size-ul simbolului (evita Invalid stops)
+        digits = info.digits
+        tick_size = info.trade_tick_size
+        if tick_size > 0:
+            sl = round(round(float(sl) / tick_size) * tick_size, digits) if sl else 0.0
+            tp = round(round(float(tp) / tick_size) * tick_size, digits) if tp else 0.0
+        else:
+            sl = round(float(sl), digits) if sl else 0.0
+            tp = round(float(tp), digits) if tp else 0.0
+        volume = round(float(volume), 2)
+
+        # Asigura distanta minima SL/TP (spread * 3 ca safety margin)
+        min_distance = info.point * max(info.spread * 3, 50)
+        if sl > 0:
+            if order_type == OrderType.MARKET_BUY and price - sl < min_distance:
+                sl = round(price - min_distance, digits)
+            elif order_type == OrderType.MARKET_SELL and sl - price < min_distance:
+                sl = round(price + min_distance, digits)
+        if tp > 0:
+            if order_type == OrderType.MARKET_BUY and tp - price < min_distance:
+                tp = round(price + min_distance, digits)
+            elif order_type == OrderType.MARKET_SELL and price - tp < min_distance:
+                tp = round(price - min_distance, digits)
+
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": symbol,

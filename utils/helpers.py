@@ -40,7 +40,7 @@ def pips_to_price(symbol: str, pips: float) -> float:
     symbol_upper = symbol.upper()
     if "JPY" in symbol_upper:
         return pips * 0.01
-    if "XAU" in symbol_upper:
+    if "XAU" in symbol_upper or "XAG" in symbol_upper:
         return pips * 0.01
     return pips * 0.0001
 

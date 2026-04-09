@@ -7,6 +7,8 @@ from datetime import date
 import pandas as pd
 import pandas_ta as ta
 
+import MetaTrader5 as mt5
+
 from utils.logger import setup_logger
 from utils.helpers import load_config, pips_to_price
 
@@ -102,11 +104,12 @@ class RiskManager:
         else:
             sl = current_price + sl_distance
 
-        logger.debug(f"SL {symbol} {direction}: {sl:.5f} (distanta: {sl_distance:.5f})")
-        return round(sl, 5)
+        digits = self._get_symbol_digits(symbol)
+        logger.debug(f"SL {symbol} {direction}: {sl:.{digits}f} (distanta: {sl_distance:.{digits}f})")
+        return float(round(sl, digits))
 
     def calculate_take_profit(
-        self, entry_price: float, stop_loss: float, direction: str
+        self, entry_price: float, stop_loss: float, direction: str, symbol: str = ""
     ) -> float:
         """Calculeaza Take Profit pe baza risk-reward ratio."""
         sl_distance = abs(entry_price - stop_loss)
@@ -117,8 +120,26 @@ class RiskManager:
         else:
             tp = entry_price - tp_distance
 
-        logger.debug(f"TP {direction}: {tp:.5f} (RR={self.take_profit_config['risk_reward_ratio']})")
-        return round(tp, 5)
+        digits = self._get_symbol_digits(symbol) if symbol else 5
+        logger.debug(f"TP {direction}: {tp:.{digits}f} (RR={self.take_profit_config['risk_reward_ratio']})")
+        return float(round(tp, digits))
+
+    @staticmethod
+    def _get_symbol_digits(symbol: str) -> int:
+        """Obtine numarul de digits pentru un simbol de la MT5."""
+        try:
+            info = mt5.symbol_info(symbol)
+            if info:
+                return info.digits
+        except Exception:
+            pass
+        # Fallback pe baza numelui
+        sym = symbol.upper()
+        if "XAU" in sym or "XAG" in sym:
+            return 3
+        if "JPY" in sym:
+            return 3
+        return 5
 
     def can_open_trade(
         self, symbol: str, open_positions: list[dict], account_balance: float

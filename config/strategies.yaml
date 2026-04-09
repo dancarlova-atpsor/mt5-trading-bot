@@ -5,7 +5,7 @@
 trend_following:
   enabled: true
   timeframe: "H1"
-  symbols: ["EURUSD", "GBPUSD", "XAUUSD"]
+  symbols: ["EURUSD.cfd", "GBPUSD.cfd", "XAUUSD.cfd", "XAGUSD.cfd"]
   ema_fast: 20
   ema_slow: 50
   macd_fast: 12
@@ -17,7 +17,7 @@ trend_following:
 mean_reversion:
   enabled: true
   timeframe: "H1"
-  symbols: ["EURUSD", "GBPUSD"]
+  symbols: ["EURUSD.cfd", "GBPUSD.cfd"]
   rsi_period: 14
   rsi_oversold: 30
   rsi_overbought: 70
@@ -28,7 +28,7 @@ mean_reversion:
 scalping:
   enabled: false
   timeframe: "M5"
-  symbols: ["EURUSD"]
+  symbols: ["EURUSD.cfd"]
   stochastic_k: 14
   stochastic_d: 3
   stochastic_smooth: 3
