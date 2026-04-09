@@ -10,6 +10,7 @@ import time
 from core.mt5_connector import MT5Connector
 from core.data_fetcher import DataFetcher
 from core.order_manager import OrderManager, OrderType
+from core.signal_bridge import SignalBridge
 from risk.risk_manager import RiskManager
 from strategies.base_strategy import Signal
 from strategies.trend_following import TrendFollowing
@@ -86,6 +87,15 @@ def main():
     data_fetcher = DataFetcher()
     order_manager = OrderManager()
     risk_manager = RiskManager()
+
+    # Signal Bridge (comunicare cu MQL5 EA)
+    exec_config = settings.get("execution", {})
+    execution_mode = exec_config.get("mode", "python_api")
+    signal_bridge = None
+    if execution_mode in ("mql5_ea", "both"):
+        mt5_files_path = exec_config.get("mt5_files_path", "") or None
+        signal_bridge = SignalBridge(mt5_files_path)
+        logger.info(f"Signal Bridge activ — mod: {execution_mode}")
 
     # Conectare MT5
     if not connector.connect():
@@ -179,24 +189,56 @@ def main():
                             account_info["balance"], sl_pips, symbol
                         )
 
-                        # Executie ordine
-                        order_type = OrderType.MARKET_BUY if direction == "BUY" else OrderType.MARKET_SELL
-                        result = order_manager.open_market_order(
-                            symbol=symbol,
-                            order_type=order_type,
-                            volume=volume,
-                            sl=sl,
-                            tp=tp,
-                            comment=f"{strategy.name}",
-                        )
+                        # Executie ordine — Python API direct si/sau Signal Bridge catre EA
+                        executed = False
 
-                        if result.success:
-                            logger.info(
-                                f"[{strategy.name}] {direction} {volume} {symbol} @ {current_price:.5f} "
-                                f"| SL={sl:.5f} TP={tp:.5f} | ID={result.order_id}"
+                        # Executie prin Python API
+                        if execution_mode in ("python_api", "both"):
+                            order_type = OrderType.MARKET_BUY if direction == "BUY" else OrderType.MARKET_SELL
+                            result = order_manager.open_market_order(
+                                symbol=symbol,
+                                order_type=order_type,
+                                volume=volume,
+                                sl=sl,
+                                tp=tp,
+                                comment=f"{strategy.name}",
                             )
+                            if result.success:
+                                logger.info(
+                                    f"[{strategy.name}][API] {direction} {volume} {symbol} @ {current_price:.5f} "
+                                    f"| SL={sl:.5f} TP={tp:.5f} | ID={result.order_id}"
+                                )
+                                executed = True
+
+                        # Executie prin Signal Bridge (MQL5 EA)
+                        if signal_bridge and execution_mode in ("mql5_ea", "both") and not executed:
+                            magic = settings["account"].get("magic_number", 123456)
+                            signal_bridge.write_signal(
+                                symbol=symbol,
+                                action=direction,
+                                volume=volume,
+                                sl=sl,
+                                tp=tp,
+                                magic=magic,
+                                comment=strategy.name,
+                            )
+                            # Asteapta confirmare de la EA
+                            timeout = exec_config.get("signal_timeout", 30)
+                            ea_status = signal_bridge.wait_for_execution(timeout_seconds=timeout)
+                            if ea_status and ea_status.get("status") == "FILLED":
+                                logger.info(
+                                    f"[{strategy.name}][EA] {direction} {volume} {symbol} "
+                                    f"| Ticket={ea_status.get('ticket')} | Price={ea_status.get('price')}"
+                                )
+                                executed = True
+                            else:
+                                logger.warning(
+                                    f"[{strategy.name}][EA] Executie esuata/timeout pentru {direction} {symbol}"
+                                )
+                            signal_bridge.clear_signal()
+
+                        if executed:
                             risk_manager.record_trade(0)  # PnL real se actualizeaza la inchidere
-                            # Reincarca pozitii (pt limita urmatoare)
                             open_positions = order_manager.get_open_positions()
 
                 # Trailing stop pe pozitii existente

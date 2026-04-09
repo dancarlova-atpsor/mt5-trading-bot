@@ -20,6 +20,11 @@ active_strategies:
   - mean_reversion
   # - scalping              # Decomenteaza cand esti gata
 
+execution:
+  mode: "python_api"          # "python_api" | "mql5_ea" | "both"
+  mt5_files_path: ""          # Gol = auto-detectare MQL5/Files/
+  signal_timeout: 30          # Timeout asteptare confirmare EA (secunde)
+
 schedule:
   check_interval_seconds: 10
   trading_hours: "08:00-22:00"
