@@ -1,6 +1,7 @@
 """
 Trading Bot MT5 — Entry Point principal cu loop de trading.
 Conecteaza la MT5, ruleaza strategii, gestioneaza risk si ordine.
+Profit Manager: trailing profit per pozitie, cicluri repetitive, limite zilnice.
 """
 
 import signal
@@ -12,6 +13,7 @@ from core.data_fetcher import DataFetcher
 from core.order_manager import OrderManager, OrderType
 from core.signal_bridge import SignalBridge
 from risk.risk_manager import RiskManager
+from risk.profit_manager import ProfitManager
 from strategies.base_strategy import Signal
 from strategies.trend_following import TrendFollowing
 from strategies.mean_reversion import MeanReversion
@@ -78,12 +80,26 @@ def load_strategies(strategies_config: dict, active_list: list) -> list[dict]:
     return loaded
 
 
+def close_all_positions(order_manager: OrderManager, connector: MT5Connector) -> float:
+    """Inchide toate pozitiile deschise. Returneaza PnL total."""
+    positions = order_manager.get_open_positions()
+    total_pnl = 0.0
+
+    for pos in positions:
+        result = order_manager.close_position(pos["ticket"], comment="cycle_close")
+        if result.success:
+            total_pnl += pos["profit"]
+            logger.info(f"Inchis #{pos['ticket']} {pos['type']} {pos['volume']} {pos['symbol']} PnL={pos['profit']:+.2f}")
+
+    return total_pnl
+
+
 def main():
-    """Functia principala — loop de trading."""
+    """Functia principala — loop de trading cu cicluri repetitive."""
     global running
 
     logger.info("=" * 50)
-    logger.info("Trading Bot MT5 — Start")
+    logger.info("Trading Bot MT5 — Start (Profit Manager activ)")
     logger.info("=" * 50)
 
     # Incarca configurari
@@ -95,6 +111,7 @@ def main():
     data_fetcher = DataFetcher()
     order_manager = OrderManager()
     risk_manager = RiskManager()
+    profit_manager = ProfitManager()
     notifier = TelegramNotifier()
     news_calendar = NewsCalendar()
 
@@ -127,8 +144,8 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     schedule = settings.get("schedule", {})
-    interval = schedule.get("check_interval_seconds", 10)
-    trading_hours = schedule.get("trading_hours", "08:00-22:00")
+    interval = schedule.get("check_interval_seconds", 60)
+    trading_hours = schedule.get("trading_hours", "00:00-23:59")
     timezone_str = schedule.get("timezone", "Europe/Bucharest")
 
     outside_hours_logged = False
@@ -143,9 +160,9 @@ def main():
                         logger.info(f"In afara orelor de trading ({trading_hours}). Astept...")
                         outside_hours_logged = True
 
-                        # Trimite raport zilnic la sfarsitul orelor de trading
                         if not daily_report_sent:
                             daily = risk_manager.get_daily_stats()
+                            pm_stats = profit_manager.get_daily_stats()
                             acc = connector.get_account_info() or {}
                             daily["balance"] = acc.get("balance", 0)
                             daily["equity"] = acc.get("equity", 0)
@@ -158,6 +175,24 @@ def main():
                 outside_hours_logged = False
                 daily_report_sent = False
 
+                # ============================================
+                # PROFIT MANAGER — verificari inainte de orice
+                # ============================================
+
+                # Verificare limita zilnica
+                daily_hit, daily_reason = profit_manager.is_daily_limit_reached()
+                if daily_hit:
+                    logger.info(f"[DAILY LIMIT] {daily_reason} — bot in asteptare")
+                    time.sleep(interval)
+                    continue
+
+                # Verificare pauza intre cicluri
+                paused, pause_reason = profit_manager.is_cycle_paused()
+                if paused:
+                    logger.debug(f"[PAUZA] {pause_reason}")
+                    time.sleep(interval)
+                    continue
+
                 # Informatii cont
                 account_info = connector.get_account_info()
                 if account_info is None:
@@ -168,7 +203,42 @@ def main():
                 # Pozitii deschise
                 open_positions = order_manager.get_open_positions()
 
-                # Itereaza strategii si simboluri
+                # ============================================
+                # PROFIT MANAGER — trailing profit + cycle target
+                # ============================================
+                if open_positions:
+                    total_unrealized = sum(p["profit"] for p in open_positions)
+
+                    # Verificare cycle target — inchide TOATE pozitiile
+                    if profit_manager.check_cycle_target(total_unrealized):
+                        realized = close_all_positions(order_manager, connector)
+                        profit_manager.record_cycle_close(realized)
+                        notifier.notify_error(
+                            f"Ciclu complet! Profit: +{realized:.2f} EUR | "
+                            f"Stats: {profit_manager.get_daily_stats()}"
+                        )
+                        open_positions = []
+                        continue
+
+                    # Verificare trailing profit per pozitie
+                    for pos in open_positions:
+                        should_close = profit_manager.check_position_trailing(
+                            pos["ticket"], pos["profit"]
+                        )
+                        if should_close:
+                            result = order_manager.close_position(pos["ticket"], comment="trailing_profit")
+                            if result.success:
+                                profit_manager.record_position_close(pos["ticket"], pos["profit"])
+                                notifier.notify_trade_closed(
+                                    pos["symbol"], pos["type"], pos["profit"], 0
+                                )
+
+                    # Reincarca pozitii dupa trailing closes
+                    open_positions = order_manager.get_open_positions()
+
+                # ============================================
+                # STRATEGII — deschide pozitii noi
+                # ============================================
                 for strat_info in strategies:
                     strategy = strat_info["strategy"]
                     symbols = strat_info["symbols"]
@@ -179,7 +249,6 @@ def main():
                         is_blackout, blackout_reason = news_calendar.is_news_blackout(symbol)
                         if is_blackout:
                             logger.info(f"[NEWS BLACKOUT] {symbol}: {blackout_reason} — skip")
-                            notifier.notify_error(f"News blackout {symbol}: {blackout_reason}")
                             continue
 
                         # Fetch date
@@ -224,7 +293,7 @@ def main():
                         if sym_info is None:
                             continue
 
-                        direction = signal_result.value  # "BUY" sau "SELL"
+                        direction = signal_result.value
                         current_price = sym_info["ask"] if direction == "BUY" else sym_info["bid"]
 
                         # Calcul SL, TP, volume
@@ -235,10 +304,9 @@ def main():
                             account_info["balance"], sl_pips, symbol
                         )
 
-                        # Executie ordine — Python API direct si/sau Signal Bridge catre EA
+                        # Executie ordine
                         executed = False
 
-                        # Executie prin Python API
                         if execution_mode in ("python_api", "both"):
                             order_type = OrderType.MARKET_BUY if direction == "BUY" else OrderType.MARKET_SELL
                             result = order_manager.open_market_order(
@@ -252,45 +320,34 @@ def main():
                             if result.success:
                                 logger.info(
                                     f"[{strategy.name}][API] {direction} {volume} {symbol} @ {current_price:.5f} "
-                                    f"| SL={sl:.5f} TP={tp:.5f} | ID={result.order_id}"
+                                    f"| SL={sl} TP={tp} | ID={result.order_id}"
                                 )
                                 executed = True
 
-                        # Executie prin Signal Bridge (MQL5 EA)
                         if signal_bridge and execution_mode in ("mql5_ea", "both") and not executed:
                             magic = settings["account"].get("magic_number", 123456)
                             signal_bridge.write_signal(
-                                symbol=symbol,
-                                action=direction,
-                                volume=volume,
-                                sl=sl,
-                                tp=tp,
-                                magic=magic,
-                                comment=strategy.name,
+                                symbol=symbol, action=direction, volume=volume,
+                                sl=sl, tp=tp, magic=magic, comment=strategy.name,
                             )
-                            # Asteapta confirmare de la EA
                             timeout = exec_config.get("signal_timeout", 30)
                             ea_status = signal_bridge.wait_for_execution(timeout_seconds=timeout)
                             if ea_status and ea_status.get("status") == "FILLED":
                                 logger.info(
                                     f"[{strategy.name}][EA] {direction} {volume} {symbol} "
-                                    f"| Ticket={ea_status.get('ticket')} | Price={ea_status.get('price')}"
+                                    f"| Ticket={ea_status.get('ticket')}"
                                 )
                                 executed = True
-                            else:
-                                logger.warning(
-                                    f"[{strategy.name}][EA] Executie esuata/timeout pentru {direction} {symbol}"
-                                )
                             signal_bridge.clear_signal()
 
                         if executed:
-                            risk_manager.record_trade(0)  # PnL real se actualizeaza la inchidere
+                            risk_manager.record_trade(0)
                             open_positions = order_manager.get_open_positions()
                             notifier.notify_trade_opened(
                                 symbol, direction, volume, current_price, sl, tp, strategy.name
                             )
 
-                # Trailing stop pe pozitii existente
+                # Trailing stop pe pret (SL-ul clasic)
                 for pos in open_positions:
                     sym_info = connector.get_symbol_info(pos["symbol"])
                     if sym_info is None:
@@ -301,10 +358,10 @@ def main():
                         order_manager.modify_position(pos["ticket"], sl=new_sl)
 
                 # Status periodic
-                daily = risk_manager.get_daily_stats()
+                pm_stats = profit_manager.get_daily_stats()
                 logger.debug(
                     f"Status: {len(open_positions)} pozitii | "
-                    f"Tranzactii azi: {daily['trades']} | PnL azi: {daily['pnl']:.2f}"
+                    f"Cicluri azi: {pm_stats['cycles']} | PnL realizat: {pm_stats['realized_pnl']:+.2f}"
                 )
 
             except Exception as e:

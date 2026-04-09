@@ -31,7 +31,7 @@ execution:
 
 schedule:
   check_interval_seconds: 60      # Verifica o data pe minut (nu la 10 sec)
-  trading_hours: "08:00-22:00"
+  trading_hours: "00:00-23:59"    # 24/24 luni-vineri
   timezone: "Europe/Bucharest"
 
 notifications:
@@ -42,6 +42,14 @@ notifications:
     notify_trades: true       # Notificare la fiecare tranzactie
     notify_daily: true        # Raport zilnic automat
     notify_errors: true       # Alerte erori si stop
+
+profit_manager:
+  trailing_activation_eur: 30     # Activare trailing la +30 EUR profit per pozitie
+  trailing_percent: 30            # Inchide daca profitul scade 30% din maxim
+  cycle_target_eur: 100           # Inchide TOATE pozitiile la +100 EUR total
+  cycle_pause_seconds: 300        # Pauza 5 min intre cicluri
+  max_daily_profit_eur: 300       # Stop dupa +300 EUR castigati pe zi
+  max_daily_loss_eur: 53          # Stop dupa -53 EUR pierduti pe zi (1% din 5324)
 
 news:
   calendar_enabled: true
