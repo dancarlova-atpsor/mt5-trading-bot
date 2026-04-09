@@ -45,8 +45,8 @@ class Scalping(BaseStrategy):
         df["stoch_k_prev"] = df["stoch_k"].shift(1)
         df["stoch_d_prev"] = df["stoch_d"].shift(1)
 
-        # VWAP — rolling cu tick_volume
-        vol_col = "tick_volume" if "tick_volume" in df.columns else "volume"
+        # VWAP — rolling (data_fetcher redenumeste tick_volume -> volume)
+        vol_col = "volume" if "volume" in df.columns else "tick_volume"
         if vol_col in df.columns and df[vol_col].sum() > 0:
             period = self.params["vwap_period"]
             typical_price = (df["high"] + df["low"] + df["close"]) / 3

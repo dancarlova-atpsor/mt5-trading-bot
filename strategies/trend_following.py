@@ -34,7 +34,9 @@ class TrendFollowing(BaseStrategy):
             signal=self.params["macd_signal"],
         )
         if macd_df is not None:
-            df["macd_hist"] = macd_df.iloc[:, 1]  # MACDh (histogram)
+            # Coloana histogram contine "MACDh" in nume
+            hist_col = [c for c in macd_df.columns if "MACDh" in c]
+            df["macd_hist"] = macd_df[hist_col[0]] if hist_col else macd_df.iloc[:, 1]
         else:
             df["macd_hist"] = float("nan")
 
