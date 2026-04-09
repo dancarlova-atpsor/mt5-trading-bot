@@ -25,6 +25,13 @@ mean_reversion:
   bb_std_dev: 2.0
   volume_confirm: true      # Confirmare volum
 
+news_sentiment:
+  enabled: true
+  timeframe: "H1"
+  symbols: ["EURUSD.cfd", "GBPUSD.cfd", "XAUUSD.cfd", "XAGUSD.cfd"]
+  min_articles: 3               # Minim articole pt semnal
+  min_score: 0.3                # Scor minim sentiment
+
 scalping:
   enabled: false
   timeframe: "M5"

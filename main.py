@@ -16,9 +16,11 @@ from strategies.base_strategy import Signal
 from strategies.trend_following import TrendFollowing
 from strategies.mean_reversion import MeanReversion
 from strategies.scalping import Scalping
+from strategies.news_strategy import NewsSentiment
 from utils.logger import setup_logger
 from utils.helpers import load_config, is_trading_hours, pips_to_price
 from utils.notifier import TelegramNotifier
+from utils.news_calendar import NewsCalendar
 
 logger = setup_logger("main", config_path="config/settings.yaml")
 
@@ -39,6 +41,7 @@ def load_strategies(strategies_config: dict, active_list: list) -> list[dict]:
         "trend_following": TrendFollowing,
         "mean_reversion": MeanReversion,
         "scalping": Scalping,
+        "news_sentiment": NewsSentiment,
     }
 
     loaded = []
@@ -89,6 +92,7 @@ def main():
     order_manager = OrderManager()
     risk_manager = RiskManager()
     notifier = TelegramNotifier()
+    news_calendar = NewsCalendar()
 
     # Signal Bridge (comunicare cu MQL5 EA)
     exec_config = settings.get("execution", {})
@@ -167,6 +171,13 @@ def main():
                     timeframe = strat_info["timeframe"]
 
                     for symbol in symbols:
+                        # News blackout check
+                        is_blackout, blackout_reason = news_calendar.is_news_blackout(symbol)
+                        if is_blackout:
+                            logger.info(f"[NEWS BLACKOUT] {symbol}: {blackout_reason} — skip")
+                            notifier.notify_error(f"News blackout {symbol}: {blackout_reason}")
+                            continue
+
                         # Fetch date
                         data = data_fetcher.get_rates(symbol, timeframe, bars=500)
                         if data is None or len(data) < 60:
@@ -177,6 +188,10 @@ def main():
                             sym_info = connector.get_symbol_info(symbol)
                             if sym_info:
                                 strategy.set_current_spread(sym_info["spread"])
+
+                        # NewsSentiment: seteaza simbolul curent
+                        if isinstance(strategy, NewsSentiment):
+                            strategy.set_current_symbol(symbol)
 
                         # Analiza
                         signal_result = strategy.analyze(data)

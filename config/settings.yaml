@@ -19,6 +19,7 @@ symbols:
 active_strategies:
   - trend_following
   - mean_reversion
+  - news_sentiment
   # - scalping              # Decomenteaza cand esti gata
 
 execution:
@@ -39,6 +40,18 @@ notifications:
     notify_trades: true       # Notificare la fiecare tranzactie
     notify_daily: true        # Raport zilnic automat
     notify_errors: true       # Alerte erori si stop
+
+news:
+  calendar_enabled: true
+  blackout_minutes_before: 30   # Nu tranzactiona 30 min inainte de stiri mari
+  blackout_minutes_after: 30    # Nu tranzactiona 30 min dupa stiri mari
+  high_impact_only: true        # Doar stiri cu impact mare
+
+sentiment:
+  enabled: true
+  newsapi_key: ""               # Sau env var NEWSAPI_KEY (optional, merge si fara)
+  min_score_threshold: 0.3      # Scor minim pt semnal
+  check_interval_minutes: 60    # Cat de des verifica stirile
 
 logging:
   level: "INFO"             # DEBUG, INFO, WARNING, ERROR
