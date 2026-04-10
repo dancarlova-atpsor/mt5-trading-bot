@@ -46,7 +46,16 @@ class RiskManager:
     def calculate_position_size(
         self, account_balance: float, stop_loss_pips: float, symbol: str
     ) -> float:
-        """Calculeaza volumul (lot size) pe baza riscului."""
+        """Calculeaza volumul (lot size) pe baza riscului.
+
+        Foloseste trade_tick_value de la broker pentru a obtine valoarea
+        reala in moneda contului (evita bug-ul JPY/metals/crypto).
+        """
+        # Verifica overrides per simbol
+        volume_overrides = self.position_sizing.get("volume_overrides", {}) or {}
+        if symbol in volume_overrides:
+            return float(volume_overrides[symbol])
+
         if self.position_sizing["method"] == "fixed_lot":
             return self.position_sizing["fixed_lot"]
 
@@ -58,34 +67,75 @@ class RiskManager:
             logger.warning("SL pips <= 0, folosesc lot minim 0.01")
             return 0.01
 
-        pip_value = pips_to_price(symbol, 1.0)
-        symbol_upper = symbol.upper()
+        # Foloseste tick_value de la broker (valoare reala in moneda contului)
+        info = mt5.symbol_info(symbol)
+        if info is None or info.trade_tick_size == 0 or info.trade_tick_value == 0:
+            logger.warning(f"Nu pot obtine tick_value pentru {symbol}, folosesc lot minim")
+            return 0.01
 
-        # Contract size difera per instrument
-        if "XAU" in symbol_upper:
-            contract_size = 100  # 1 lot XAU = 100 oz
-        elif "US500" in symbol_upper or "US30" in symbol_upper or "NAS" in symbol_upper:
-            contract_size = 1  # Indici CFD — contract size variabil
-        else:
-            contract_size = 100000  # Forex standard
+        # Pip in price
+        pip_price = pips_to_price(symbol, 1.0)
 
-        lot_size = risk_amount / (stop_loss_pips * pip_value * contract_size)
+        # Cati tick-uri are un pip (pt forex 5-digit: 1 pip = 10 ticks)
+        pip_ticks = pip_price / info.trade_tick_size
+
+        # Valoare 1 pip per 1 lot in moneda contului
+        pip_value_per_lot = info.trade_tick_value * pip_ticks
+
+        # Risc per lot la SL hit
+        risk_per_lot = stop_loss_pips * pip_value_per_lot
+
+        if risk_per_lot <= 0:
+            return 0.01
+
+        lot_size = risk_amount / risk_per_lot
 
         # Clamp la limite
         max_lot = self.position_sizing.get("max_lot", 1.0)
-        lot_size = max(0.01, min(lot_size, max_lot))
+        lot_size = max(info.volume_min, min(lot_size, max_lot))
+
+        # Rotunjeste la volume_step
+        if info.volume_step > 0:
+            lot_size = round(lot_size / info.volume_step) * info.volume_step
         lot_size = round(lot_size, 2)
 
         logger.debug(
             f"Position size {symbol}: balance={account_balance:.2f}, "
-            f"SL={stop_loss_pips:.1f} pips, risk={risk_amount:.2f}, lot={lot_size}"
+            f"SL={stop_loss_pips:.1f} pips, risk={risk_amount:.2f}, "
+            f"pip_val={pip_value_per_lot:.2f}/lot, lot={lot_size}"
         )
         return lot_size
 
     def calculate_stop_loss(
         self, data: pd.DataFrame, direction: str, current_price: float, symbol: str
     ) -> float:
-        """Calculeaza Stop Loss — ATR-based sau default pips."""
+        """Calculeaza Stop Loss — ATR-based, override per simbol sau default pips."""
+        # Verifica override per simbol (in pips sau price)
+        sl_overrides = self.stop_loss_config.get("symbol_overrides", {}) or {}
+        if symbol in sl_overrides:
+            override = sl_overrides[symbol]
+            # Override poate fi in "pips" sau "price" direct
+            if isinstance(override, dict):
+                if "pips" in override:
+                    sl_distance = pips_to_price(symbol, override["pips"])
+                elif "price" in override:
+                    sl_distance = float(override["price"])
+                else:
+                    sl_distance = pips_to_price(symbol, self.stop_loss_config["default_pips"])
+            else:
+                # Direct valoare numerica = pips
+                sl_distance = pips_to_price(symbol, float(override))
+
+            if direction == "BUY":
+                sl = current_price - sl_distance
+            else:
+                sl = current_price + sl_distance
+
+            digits = self._get_symbol_digits(symbol)
+            logger.debug(f"SL OVERRIDE {symbol} {direction}: {sl:.{digits}f} (distanta: {sl_distance:.{digits}f})")
+            return float(round(sl, digits))
+
+        # Default: ATR-based sau pips
         if self.stop_loss_config.get("use_atr", False) and len(data) >= self.stop_loss_config["atr_period"] + 1:
             atr = ta.atr(
                 data["high"], data["low"], data["close"],

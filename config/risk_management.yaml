@@ -6,13 +6,26 @@ position_sizing:
   method: "percent_risk"    # "fixed_lot" sau "percent_risk"
   risk_per_trade: 0.5       # % din cont per tranzactie (0.5% = conservator)
   fixed_lot: 0.01           # Lot fix (daca method = fixed_lot)
-  max_lot: 0.1              # Lot maxim permis (safety cap)
+  max_lot: 0.5              # Lot maxim permis (safety cap)
+
+  # Volum fix per simbol (override pe calculul automat)
+  # Decizie bazata pe istoricul real + analiza ATR per simbol
+  volume_overrides:
+    XAGUSD.cfd: 0.2         # Argint — 95.8% win rate pe real, +6002 EUR
+    ETHUSD.cfd: 1.0         # Ethereum — vol 0.01 prea mic, ATR mare
+    BTCUSD.cfd: 0.01        # Bitcoin — istoric real -6086 EUR, lot minim safety
 
 stop_loss:
   default_pips: 50
   use_atr: true             # SL bazat pe ATR
   atr_multiplier: 1.5
   atr_period: 14
+
+  # Override SL per simbol (pips = incrementi minimi)
+  # Pentru simboluri unde ATR e prea larg
+  symbol_overrides:
+    XAGUSD.cfd:
+      pips: 15              # 15 centi SL = ~150 EUR risc pe 0.2 lot
 
 take_profit:
   risk_reward_ratio: 2.0    # TP = SL * ratio
