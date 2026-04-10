@@ -1,21 +1,18 @@
 # ============================================
-# Parametri per Strategie
-# XAUUSD SCOS — swap brutal (-610 USD/lot/zi pe BUY)
-# XAGUSD pastrat — swap mic, verificat live pe cont real
+# Parametri per Strategie — TOP 5 ales dupa grid search
 # ============================================
 
 trend_following:
   enabled: true
   timeframe: "H1"
-  # Profitabil pe: EURUSD(PF1.32), AUDUSD(PF1.32), CADJPY(PF1.32),
-  #                XAGUSD(PF1.25), ETHUSD(PF1.26), EURGBP(PF1.12)
+  # Grid search a confirmat: EMA 20/50 ADX 25 e optim pe EURUSD, AUDUSD
+  # EURGBP include ca diversificare (TF PF 1.08 pe 3 luni)
+  # XAGUSD include din istoric real 95.8% win rate
   symbols:
     - EURUSD.cfd
     - AUDUSD.cfd
-    - CADJPY.cfd
-    - XAGUSD.cfd
-    - ETHUSD.cfd
     - EURGBP.cfd
+    - XAGUSD.cfd
   ema_fast: 20
   ema_slow: 50
   macd_fast: 12
@@ -27,34 +24,18 @@ trend_following:
 breakout:
   enabled: true
   timeframe: "H1"
-  # Profitabil pe: GBPUSD(PF1.13), AUDJPY(PF1.53), EURJPY(PF1.16),
-  #                AUDUSD(PF1.14), US30(PF1.17 — swap mic pe SHORT)
+  # Grid search: Breakout LB50 Vol2.0 → GBPUSD PF 1.59 (cel mai bun!)
   symbols:
     - GBPUSD.cfd
-    - AUDJPY.cfd
-    - EURJPY.cfd
-    - AUDUSD.cfd
-  lookback_period: 20
+  lookback_period: 50        # OPTIMIZAT (era 20)
   atr_period: 14
   min_atr_ratio: 0.8
-  min_vol_ratio: 1.2
+  min_vol_ratio: 2.0         # OPTIMIZAT (era 1.2)
 
 macd_divergence:
-  enabled: true
+  enabled: false             # Dezactivat — grid search arata nu e profitabil in piata actuala
   timeframe: "H1"
-  # Profitabil pe: USDJPY(PF3.80!), GBPJPY(PF2.20), EURCAD(PF3.53 NOU!),
-  #                BTCUSD(PF1.99), ETHUSD(PF2.73), EURUSD(PF1.81),
-  #                CADJPY(PF1.73), AUDUSD(PF1.50), NZDUSD(PF1.30 NOU!)
-  symbols:
-    - USDJPY.cfd
-    - GBPJPY.cfd
-    - EURCAD.cfd
-    - BTCUSD.cfd
-    - ETHUSD.cfd
-    - EURUSD.cfd
-    - CADJPY.cfd
-    - AUDUSD.cfd
-    - NZDUSD.cfd
+  symbols: []
   macd_fast: 12
   macd_slow: 26
   macd_signal: 9
@@ -66,19 +47,18 @@ macd_divergence:
 news_sentiment:
   enabled: true
   timeframe: "H1"
+  # Confirmare secundara pe TOP 5
   symbols:
     - EURUSD.cfd
     - GBPUSD.cfd
     - XAGUSD.cfd
-    - BTCUSD.cfd
-    - ETHUSD.cfd
   min_articles: 3
   min_score: 0.3
 
 mean_reversion:
-  enabled: false              # Dezactivat — pierde pe piata actuala
+  enabled: false
   timeframe: "H1"
-  symbols: ["EURUSD.cfd"]
+  symbols: []
   rsi_period: 14
   rsi_oversold: 30
   rsi_overbought: 70
@@ -88,7 +68,7 @@ mean_reversion:
 scalping:
   enabled: false
   timeframe: "M5"
-  symbols: ["EURUSD.cfd"]
+  symbols: []
   stochastic_k: 14
   stochastic_d: 3
   stochastic_smooth: 3

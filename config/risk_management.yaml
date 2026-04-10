@@ -9,11 +9,8 @@ position_sizing:
   max_lot: 0.5              # Lot maxim permis (safety cap)
 
   # Volum fix per simbol (override pe calculul automat)
-  # Decizie bazata pe istoricul real + analiza ATR per simbol
   volume_overrides:
-    XAGUSD.cfd: 0.2         # Argint — 95.8% win rate pe real, +6002 EUR
-    ETHUSD.cfd: 1.0         # Ethereum — vol 0.01 prea mic, ATR mare
-    BTCUSD.cfd: 0.01        # Bitcoin — istoric real -6086 EUR, lot minim safety
+    XAGUSD.cfd: 0.2         # Argint — 95.8% win rate pe real, SL strans 15c
 
 stop_loss:
   default_pips: 50
@@ -38,8 +35,8 @@ trailing_stop:
   trail_pips: 15            # Distanta de trailing
 
 limits:
-  max_open_positions: 6           # 6 pozitii simultan (12 simboluri)
+  max_open_positions: 5           # Max 5 pozitii simultan (cate una per simbol)
   max_positions_per_symbol: 1     # Doar 1 pozitie per simbol (evita stacking)
   max_daily_loss_percent: 2.0    # Opreste botul daca pierde 2% azi
-  max_daily_trades: 20            # Mai multe trades pt mai multe simboluri
+  max_daily_trades: 15            # Max 15 tranzactii/zi pe 5 simboluri
   max_correlation_exposure: 3    # Max pozitii pe perechi corelate

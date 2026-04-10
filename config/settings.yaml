@@ -10,22 +10,12 @@ account:
   magic_number: 123456      # ID unic pentru ordinele botului
 
 symbols:
-  # Forex
-  - EURUSD.cfd
-  - GBPUSD.cfd
-  - USDJPY.cfd
-  - AUDUSD.cfd
-  - CADJPY.cfd
-  - AUDJPY.cfd
-  - GBPJPY.cfd
-  - EURGBP.cfd
-  - EURCAD.cfd       # NOU — PF 3.53 pe MACD Divergence
-  - NZDUSD.cfd       # NOU — swap mic, PF 1.30 MACD
-  # Metale (doar argint — aurul are swap brutal)
-  - XAGUSD.cfd
-  # Crypto
-  - BTCUSD.cfd
-  - ETHUSD.cfd
+  # TOP 5 dupa analiza 6m/3m/1m + grid search parametri
+  - EURUSD.cfd       # TF 20/50 ADX25, PF 1.53, WR 43%, PnL +846
+  - AUDUSD.cfd       # TF 20/50 ADX25, PF 1.41, WR 42%, PnL +652
+  - GBPUSD.cfd       # Breakout LB50 Vol2.0, PF 1.59, PnL +150
+  - XAGUSD.cfd       # Istoric real 95.8% win, SL 15c strans
+  - EURGBP.cfd       # TF PF 1.08, swap mic, stabil
 
 active_strategies:
   - trend_following
