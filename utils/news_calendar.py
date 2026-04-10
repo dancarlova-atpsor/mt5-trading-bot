@@ -124,12 +124,17 @@ class NewsCalendar:
 
         try:
             events = self._fetch_forex_factory()
+            # Cache mereu, chiar si cu lista goala (evita spam la fiecare apel)
+            self._events_cache = events
+            self._last_fetch = time.time()
             if events:
-                self._events_cache = events
-                self._last_fetch = time.time()
                 logger.info(f"Calendar actualizat: {len(events)} evenimente")
+            else:
+                logger.info("Calendar gol — folosesc cache pana la urmatoarea verificare (1h)")
         except Exception as e:
             logger.error(f"Eroare la actualizare calendar: {e}")
+            # Chiar si la eroare, update last_fetch ca sa nu spam-uim
+            self._last_fetch = time.time()
 
     def _fetch_forex_factory(self) -> list[dict]:
         """Scrapeaza calendarul de pe Forex Factory."""
