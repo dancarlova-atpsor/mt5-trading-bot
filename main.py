@@ -25,6 +25,7 @@ from utils.logger import setup_logger
 from utils.helpers import load_config, is_trading_hours, pips_to_price
 from utils.notifier import TelegramNotifier
 from utils.news_calendar import NewsCalendar
+from superbot import SuperBot
 
 logger = setup_logger("main", config_path="config/settings.yaml")
 
@@ -115,6 +116,9 @@ def main():
     notifier = TelegramNotifier()
     news_calendar = NewsCalendar()
 
+    # SuperBot — layer de inteligenta adaptiv
+    superbot = None
+
     # Signal Bridge (comunicare cu MQL5 EA)
     exec_config = settings.get("execution", {})
     execution_mode = exec_config.get("mode", "python_api")
@@ -138,6 +142,24 @@ def main():
         logger.error("Nicio strategie activa. Verifica config/settings.yaml")
         connector.disconnect()
         sys.exit(1)
+
+    # SuperBot — layer adaptiv (optional)
+    if settings.get("superbot", {}).get("enabled", False):
+        # Strategies map pt lookup in SuperBot
+        strategies_map = {s["name"]: s["strategy"] for s in strategies}
+        try:
+            superbot = SuperBot(
+                config=settings,
+                data_fetcher=data_fetcher,
+                risk_manager=risk_manager,
+                strategies_map=strategies_map,
+                strategies_config=strategies_config,
+                symbols=settings.get("symbols", []),
+            )
+            superbot.start()
+        except Exception as e:
+            logger.error(f"SuperBot init failed: {e}")
+            superbot = None
 
     # Graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
@@ -174,6 +196,10 @@ def main():
                     continue
                 outside_hours_logged = False
                 daily_report_sent = False
+
+                # SuperBot tick — cere deep analysis la fiecare N iteratii
+                if superbot is not None:
+                    superbot.tick()
 
                 # ============================================
                 # PROFIT MANAGER — verificari inainte de orice
@@ -280,6 +306,22 @@ def main():
                         if already_open:
                             continue
 
+                        # SuperBot gate — regime + correlation + performance
+                        superbot_size_mult = 1.0
+                        if superbot is not None:
+                            ok, size_mult, sb_reason = superbot.gate_trade(
+                                symbol=symbol,
+                                strategy_name=strat_info["name"],
+                                direction=direction_str,
+                                open_positions=open_positions,
+                            )
+                            if not ok:
+                                logger.info(f"[SuperBot] {symbol}: BLOCKED — {sb_reason}")
+                                continue
+                            superbot_size_mult = size_mult
+                            if size_mult != 1.0:
+                                logger.info(f"[SuperBot] {symbol}: size_mult={size_mult:.2f} ({sb_reason})")
+
                         # Verificare risk
                         can_trade, reason = risk_manager.can_open_trade(
                             symbol, open_positions, account_info["balance"]
@@ -303,6 +345,12 @@ def main():
                         volume = risk_manager.calculate_position_size(
                             account_info["balance"], sl_pips, symbol
                         )
+
+                        # Aplica SuperBot size multiplier
+                        if superbot_size_mult != 1.0:
+                            volume = round(volume * superbot_size_mult, 2)
+                            # Clamp la limite broker (min 0.01)
+                            volume = max(0.01, volume)
 
                         # Executie ordine
                         executed = False
@@ -371,6 +419,11 @@ def main():
             time.sleep(interval)
 
     finally:
+        if superbot is not None:
+            try:
+                superbot.shutdown()
+            except Exception as e:
+                logger.error(f"SuperBot shutdown error: {e}")
         notifier.notify_bot_stopped()
         connector.disconnect()
         logger.info("=" * 50)
