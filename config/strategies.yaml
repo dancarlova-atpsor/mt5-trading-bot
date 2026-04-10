@@ -1,18 +1,18 @@
 # ============================================
 # Parametri per Strategie
-# Fiecare strategie ruleaza DOAR pe simbolurile pe care e profitabila (backtest)
+# XAUUSD SCOS — swap brutal (-610 USD/lot/zi pe BUY)
+# XAGUSD pastrat — swap mic, verificat live pe cont real
 # ============================================
 
 trend_following:
   enabled: true
   timeframe: "H1"
   # Profitabil pe: EURUSD(PF1.32), AUDUSD(PF1.32), CADJPY(PF1.32),
-  #                XAUUSD(PF1.19), XAGUSD(PF1.25), ETHUSD(PF1.26), EURGBP(PF1.12)
+  #                XAGUSD(PF1.25), ETHUSD(PF1.26), EURGBP(PF1.12)
   symbols:
     - EURUSD.cfd
     - AUDUSD.cfd
     - CADJPY.cfd
-    - XAUUSD.cfd
     - XAGUSD.cfd
     - ETHUSD.cfd
     - EURGBP.cfd
@@ -27,12 +27,11 @@ trend_following:
 breakout:
   enabled: true
   timeframe: "H1"
-  # Profitabil pe: GBPUSD(PF1.13), AUDJPY(PF1.53), XAUUSD(PF1.23),
-  #                EURJPY(PF1.16), AUDUSD(PF1.14)
+  # Profitabil pe: GBPUSD(PF1.13), AUDJPY(PF1.53), EURJPY(PF1.16),
+  #                AUDUSD(PF1.14), US30(PF1.17 — swap mic pe SHORT)
   symbols:
     - GBPUSD.cfd
     - AUDJPY.cfd
-    - XAUUSD.cfd
     - EURJPY.cfd
     - AUDUSD.cfd
   lookback_period: 20
@@ -43,16 +42,19 @@ breakout:
 macd_divergence:
   enabled: true
   timeframe: "H1"
-  # Profitabil pe: USDJPY(PF3.80!), GBPJPY(PF2.20), BTCUSD(PF1.99),
-  #                ETHUSD(PF2.73), EURUSD(PF1.81), CADJPY(PF1.73), AUDUSD(PF1.50)
+  # Profitabil pe: USDJPY(PF3.80!), GBPJPY(PF2.20), EURCAD(PF3.53 NOU!),
+  #                BTCUSD(PF1.99), ETHUSD(PF2.73), EURUSD(PF1.81),
+  #                CADJPY(PF1.73), AUDUSD(PF1.50), NZDUSD(PF1.30 NOU!)
   symbols:
     - USDJPY.cfd
     - GBPJPY.cfd
+    - EURCAD.cfd
     - BTCUSD.cfd
     - ETHUSD.cfd
     - EURUSD.cfd
     - CADJPY.cfd
     - AUDUSD.cfd
+    - NZDUSD.cfd
   macd_fast: 12
   macd_slow: 26
   macd_signal: 9
@@ -67,7 +69,6 @@ news_sentiment:
   symbols:
     - EURUSD.cfd
     - GBPUSD.cfd
-    - XAUUSD.cfd
     - XAGUSD.cfd
     - BTCUSD.cfd
     - ETHUSD.cfd

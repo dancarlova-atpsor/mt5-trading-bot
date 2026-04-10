@@ -19,8 +19,9 @@ symbols:
   - AUDJPY.cfd
   - GBPJPY.cfd
   - EURGBP.cfd
-  # Metale
-  - XAUUSD.cfd
+  - EURCAD.cfd       # NOU — PF 3.53 pe MACD Divergence
+  - NZDUSD.cfd       # NOU — swap mic, PF 1.30 MACD
+  # Metale (doar argint — aurul are swap brutal)
   - XAGUSD.cfd
   # Crypto
   - BTCUSD.cfd
@@ -46,9 +47,9 @@ schedule:
 
 notifications:
   telegram:
-    enabled: false            # Seteaza true + env vars pt activare
-    bot_token: ""             # Sau env var TELEGRAM_BOT_TOKEN
-    chat_id: ""               # Sau env var TELEGRAM_CHAT_ID
+    enabled: true
+    bot_token: "8689397349:AAGMYNnNquOkoHepkcIPWm1vs7Xo_g-WO3I"
+    chat_id: "8374879733"
     notify_trades: true       # Notificare la fiecare tranzactie
     notify_daily: true        # Raport zilnic automat
     notify_errors: true       # Alerte erori si stop
