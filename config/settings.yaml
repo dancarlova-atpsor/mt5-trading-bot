@@ -45,9 +45,9 @@ notifications:
     notify_errors: true       # Alerte erori si stop
 
 profit_manager:
-  trailing_activation_eur: 30     # Activare trailing la +30 EUR profit per pozitie
+  trailing_activation_eur: 40     # Activare trailing la +40 EUR (era 30)
   trailing_percent: 30            # Inchide daca profitul scade 30% din maxim
-  cycle_target_eur: 100           # Inchide TOATE pozitiile la +100 EUR total
+  cycle_target_eur: 150           # Target ciclu +150 EUR (era 100) — let profits run
   cycle_pause_seconds: 300        # Pauza 5 min intre cicluri
   max_daily_profit_eur: 300       # Stop dupa +300 EUR castigati pe zi
   max_daily_loss_eur: 53          # Stop dupa -53 EUR pierduti pe zi (1% din 5324)

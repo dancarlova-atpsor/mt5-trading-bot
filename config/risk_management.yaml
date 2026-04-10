@@ -4,9 +4,9 @@
 
 position_sizing:
   method: "percent_risk"    # "fixed_lot" sau "percent_risk"
-  risk_per_trade: 0.5       # % din cont per tranzactie (0.5% = conservator)
+  risk_per_trade: 1.0       # 1% din cont per tranzactie (agresiv pt target 300/zi)
   fixed_lot: 0.01           # Lot fix (daca method = fixed_lot)
-  max_lot: 0.5              # Lot maxim permis (safety cap)
+  max_lot: 1.0              # Lot maxim permis (safety cap)
 
   # Volum fix per simbol (override pe calculul automat)
   volume_overrides:

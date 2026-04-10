@@ -33,16 +33,22 @@ breakout:
   min_vol_ratio: 2.0         # OPTIMIZAT (era 1.2)
 
 macd_divergence:
-  enabled: false             # Dezactivat — grid search arata nu e profitabil in piata actuala
+  enabled: true              # Reactivat cu parametri RELAXATI pentru mai multe semnale
   timeframe: "H1"
-  symbols: []
+  # Pe simbolurile TOP 5 (complementar cu TrendFollowing/Breakout)
+  symbols:
+    - EURUSD.cfd
+    - AUDUSD.cfd
+    - GBPUSD.cfd
+    - EURGBP.cfd
+    - XAGUSD.cfd
   macd_fast: 12
   macd_slow: 26
   macd_signal: 9
   rsi_period: 14
-  rsi_oversold: 40
-  rsi_overbought: 60
-  divergence_lookback: 30
+  rsi_oversold: 35           # RELAXAT (era 40)
+  rsi_overbought: 65         # RELAXAT (era 60)
+  divergence_lookback: 25    # RELAXAT (era 30) — divergente mai recente
 
 news_sentiment:
   enabled: true
