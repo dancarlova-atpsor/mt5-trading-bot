@@ -65,7 +65,7 @@ sentiment:
   check_interval_minutes: 60    # Cat de des verifica stirile
 
 superbot:
-  enabled: false                           # OFF pana luni — test curent cu botul normal pana la 23:59
+  enabled: true                            # Activat 2026-04-14 — deep analysis la 30 min
   deep_analysis_interval_iterations: 30    # 30 × 60s = 30 min
   regime:
     adx_period: 14

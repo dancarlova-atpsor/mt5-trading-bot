@@ -81,16 +81,30 @@ def load_strategies(strategies_config: dict, active_list: list) -> list[dict]:
     return loaded
 
 
-def close_all_positions(order_manager: OrderManager, connector: MT5Connector) -> float:
-    """Inchide toate pozitiile deschise. Returneaza PnL total."""
+def close_all_positions(order_manager: OrderManager, connector: MT5Connector, superbot=None) -> float:
+    """Inchide toate pozitiile deschise. Returneaza PnL total.
+
+    Daca superbot != None, notifica on_trade_closed() pentru fiecare pozitie inchisa cu succes.
+    """
     positions = order_manager.get_open_positions()
     total_pnl = 0.0
+    close_ts = time.time()
 
     for pos in positions:
         result = order_manager.close_position(pos["ticket"], comment="cycle_close")
         if result.success:
             total_pnl += pos["profit"]
             logger.info(f"Inchis #{pos['ticket']} {pos['type']} {pos['volume']} {pos['symbol']} PnL={pos['profit']:+.2f}")
+            if superbot is not None:
+                try:
+                    superbot.on_trade_closed(
+                        symbol=pos["symbol"],
+                        strategy=pos.get("comment") or "unknown",
+                        pnl=pos["profit"],
+                        closed_at=close_ts,
+                    )
+                except Exception as e:
+                    logger.error(f"SuperBot on_trade_closed error: {e}")
 
     return total_pnl
 
@@ -144,6 +158,7 @@ def main():
         sys.exit(1)
 
     # SuperBot — layer adaptiv (optional)
+    superbot = None
     if settings.get("superbot", {}).get("enabled", False):
         # Strategies map pt lookup in SuperBot
         strategies_map = {s["name"]: s["strategy"] for s in strategies}
@@ -237,7 +252,7 @@ def main():
 
                     # Verificare cycle target — inchide TOATE pozitiile
                     if profit_manager.check_cycle_target(total_unrealized):
-                        realized = close_all_positions(order_manager, connector)
+                        realized = close_all_positions(order_manager, connector, superbot=superbot)
                         profit_manager.record_cycle_close(realized)
                         notifier.notify_error(
                             f"Ciclu complet! Profit: +{realized:.2f} EUR | "
@@ -258,6 +273,17 @@ def main():
                                 notifier.notify_trade_closed(
                                     pos["symbol"], pos["type"], pos["profit"], 0
                                 )
+                                # SuperBot — feed performance tracker
+                                if superbot is not None:
+                                    try:
+                                        superbot.on_trade_closed(
+                                            symbol=pos["symbol"],
+                                            strategy=pos.get("comment") or "unknown",
+                                            pnl=pos["profit"],
+                                            closed_at=time.time(),
+                                        )
+                                    except Exception as e:
+                                        logger.error(f"SuperBot on_trade_closed error: {e}")
 
                     # Reincarca pozitii dupa trailing closes
                     open_positions = order_manager.get_open_positions()
@@ -411,6 +437,18 @@ def main():
                     f"Status: {len(open_positions)} pozitii | "
                     f"Cicluri azi: {pm_stats['cycles']} | PnL realizat: {pm_stats['realized_pnl']:+.2f}"
                 )
+
+                # SuperBot status — la fiecare 10 iteratii (~10 min la interval=60s)
+                if superbot is not None and superbot.enabled:
+                    if superbot._iter_counter % 10 == 0 and superbot._iter_counter > 0:
+                        sb_status = superbot.get_status()
+                        plan_summary = ", ".join(
+                            f"{sym}:{p.get('regime','?')}/{p.get('strategy','?')}/x{p.get('size_mult',1.0):.1f}"
+                            for sym, p in sb_status["symbol_plan"].items()
+                        ) or "no plan"
+                        logger.info(f"[SuperBot #{sb_status['iter_counter']}] {plan_summary}")
+                        if sb_status["disabled_symbols"]:
+                            logger.info(f"[SuperBot] Simboluri dezactivate: {sb_status['disabled_symbols']}")
 
             except Exception as e:
                 logger.error(f"Eroare in loop: {e}", exc_info=True)
