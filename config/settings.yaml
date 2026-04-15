@@ -3,7 +3,7 @@
 # ============================================
 
 account:
-  number: 9047351           # Cont demo Earn Broker
+  number: 9047479           # Cont demo Earn Broker (creat 2026-04-14)
   password: ""              # Se seteaza din env var MT5_PASSWORD
   server: "EarnBroker-Sharp ECN"
   mode: "demo"              # "demo" sau "real"
@@ -76,9 +76,9 @@ superbot:
     quiet_percentile_low: 20
   performance:
     window_hours: 24
-    min_trades_to_evaluate: 5
-    min_win_rate: 35
-    disable_hours: 4
+    min_trades_to_evaluate: 4        # Redus de la 5 — reactie mai rapida la pierderi
+    min_win_rate: 40                 # Crescut de la 35 — sta exigent
+    disable_hours: 6                 # Crescut de la 4 — lasa piata sa se stabilizeze
     history_file: "logs/superbot/performance.json"
   correlation:
     timeframe: "M15"

@@ -8,6 +8,8 @@ import signal
 import sys
 import time
 
+import MetaTrader5 as mt5
+
 from core.mt5_connector import MT5Connector
 from core.data_fetcher import DataFetcher
 from core.order_manager import OrderManager, OrderType
@@ -79,6 +81,86 @@ def load_strategies(strategies_config: dict, active_list: list) -> list[dict]:
         logger.info(f"Strategie incarcata: {name} | Simboluri: {symbols} | TF: {timeframe}")
 
     return loaded
+
+
+def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts: float) -> float:
+    """Polls broker's deals history si feed-uieste pozitiile inchise noi in SuperBot.
+
+    Detecteaza TOATE inchiderile (SL, TP, manual, trailing) — nu doar cele initiate de cod.
+    Necesar pentru auto-disable: altfel SL-hits sunt invizibile pt performance_tracker.
+
+    Returns: noul timestamp pentru urmatorul poll (now).
+    """
+    if superbot is None or not superbot.enabled:
+        return time.time()
+
+    now = time.time()
+    try:
+        # Cauta cu overlap 2 min pentru siguranta (clock skew, retry-uri broker)
+        deals = mt5.history_deals_get(from_ts - 120, now + 60)
+        if deals is None or len(deals) == 0:
+            return now
+
+        # Grupeaza pe position_id ca sa gasesc perechile IN/OUT
+        by_position: dict = {}
+        for d in deals:
+            if d.magic != magic:
+                continue
+            pid = d.position_id
+            if pid not in by_position:
+                by_position[pid] = {"in": None, "out": None}
+            if d.entry == mt5.DEAL_ENTRY_IN:
+                by_position[pid]["in"] = d
+            elif d.entry == mt5.DEAL_ENTRY_OUT:
+                by_position[pid]["out"] = d
+
+        for pid, pair in by_position.items():
+            out_deal = pair["out"]
+            if out_deal is None:
+                continue  # Inca deschisa
+            if out_deal.ticket in known_closed_tickets:
+                continue  # Deja procesata
+            known_closed_tickets.add(out_deal.ticket)
+
+            in_deal = pair["in"]
+            # Fallback: daca IN nu e in fereastra, cauta cu query pe position
+            if in_deal is None:
+                try:
+                    all_deals = mt5.history_deals_get(position=pid)
+                    if all_deals:
+                        for d in all_deals:
+                            if d.entry == mt5.DEAL_ENTRY_IN:
+                                in_deal = d
+                                break
+                except Exception:
+                    pass
+
+            strategy = (in_deal.comment if in_deal else out_deal.comment) or "unknown"
+            # Curata comentariile broker-side ("[sl 0.7116]", "[tp]")
+            if strategy.startswith("[") or strategy.lower() in ("sl", "tp", "so"):
+                strategy = "unknown"
+            symbol = out_deal.symbol
+            pnl = float(out_deal.profit) + float(out_deal.commission) + float(out_deal.swap)
+            opened_at = float(in_deal.time) if in_deal else float(out_deal.time)
+            closed_at = float(out_deal.time)
+
+            try:
+                superbot.on_trade_closed(
+                    symbol=symbol, strategy=strategy, pnl=pnl,
+                    opened_at=opened_at, closed_at=closed_at,
+                )
+                close_kind = "SL/TP" if pnl < 0 or "[" in (out_deal.comment or "") else "close"
+                logger.info(
+                    f"[SuperBot] Broker {close_kind}: #{out_deal.ticket} {symbol} "
+                    f"[{strategy}] PnL={pnl:+.2f}"
+                )
+            except Exception as e:
+                logger.error(f"on_trade_closed feed error: {e}")
+
+    except Exception as e:
+        logger.error(f"poll_broker_closes error: {e}")
+
+    return now
 
 
 def close_all_positions(order_manager: OrderManager, connector: MT5Connector, superbot=None) -> float:
@@ -188,6 +270,11 @@ def main():
     outside_hours_logged = False
     daily_report_sent = False
 
+    # SuperBot broker-close polling state
+    superbot_known_closed_tickets: set = set()
+    superbot_last_poll_ts = time.time()
+    superbot_magic = settings["account"].get("magic_number", 123456)
+
     try:
         while running:
             try:
@@ -215,6 +302,13 @@ def main():
                 # SuperBot tick — cere deep analysis la fiecare N iteratii
                 if superbot is not None:
                     superbot.tick()
+                    # Poll broker pt inchideri noi (SL/TP) — feed in performance_tracker
+                    superbot_last_poll_ts = poll_broker_closes(
+                        superbot,
+                        superbot_known_closed_tickets,
+                        superbot_magic,
+                        superbot_last_poll_ts,
+                    )
 
                 # ============================================
                 # PROFIT MANAGER — verificari inainte de orice

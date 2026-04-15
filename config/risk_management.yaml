@@ -10,7 +10,8 @@ position_sizing:
 
   # Volum fix per simbol (override pe calculul automat)
   volume_overrides:
-    XAGUSD.cfd: 0.2         # Argint — 95.8% win rate pe real, SL strans 15c
+    XAGUSD.cfd: 0.12        # Redus de la 0.2 dupa overnight test (too many SL-hits).
+                            # Cu SuperBot size_mult 1.3x → 0.156 efectiv (~0.15).
 
 stop_loss:
   default_pips: 50
