@@ -83,7 +83,7 @@ def load_strategies(strategies_config: dict, active_list: list) -> list[dict]:
     return loaded
 
 
-def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts: float) -> float:
+def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts: float, symbol_last_close_time: dict = None) -> float:
     """Polls broker's deals history si feed-uieste pozitiile inchise noi in SuperBot.
 
     Detecteaza TOATE inchiderile (SL, TP, manual, trailing) — nu doar cele initiate de cod.
@@ -154,6 +154,8 @@ def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts:
                     f"[SuperBot] Broker {close_kind}: #{out_deal.ticket} {symbol} "
                     f"[{strategy}] PnL={pnl:+.2f}"
                 )
+                if symbol_last_close_time is not None:
+                    symbol_last_close_time[symbol] = closed_at
             except Exception as e:
                 logger.error(f"on_trade_closed feed error: {e}")
 
@@ -163,7 +165,7 @@ def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts:
     return now
 
 
-def close_all_positions(order_manager: OrderManager, connector: MT5Connector, superbot=None) -> float:
+def close_all_positions(order_manager: OrderManager, connector: MT5Connector, superbot=None, symbol_last_close_time: dict = None) -> float:
     """Inchide toate pozitiile deschise. Returneaza PnL total.
 
     Daca superbot != None, notifica on_trade_closed() pentru fiecare pozitie inchisa cu succes.
@@ -187,6 +189,8 @@ def close_all_positions(order_manager: OrderManager, connector: MT5Connector, su
                     )
                 except Exception as e:
                     logger.error(f"SuperBot on_trade_closed error: {e}")
+            if symbol_last_close_time is not None:
+                symbol_last_close_time[pos["symbol"]] = close_ts
 
     return total_pnl
 
@@ -275,6 +279,10 @@ def main():
     superbot_last_poll_ts = time.time()
     superbot_magic = settings["account"].get("magic_number", 123456)
 
+    # Per-symbol cooldown — evita re-entry rapid dupa close
+    symbol_last_close_time: dict[str, float] = {}
+    position_cooldown = settings.get("position_cooldown_seconds", 300)
+
     try:
         while running:
             try:
@@ -308,6 +316,7 @@ def main():
                         superbot_known_closed_tickets,
                         superbot_magic,
                         superbot_last_poll_ts,
+                        symbol_last_close_time=symbol_last_close_time,
                     )
 
                 # ============================================
@@ -346,7 +355,7 @@ def main():
 
                     # Verificare cycle target — inchide TOATE pozitiile
                     if profit_manager.check_cycle_target(total_unrealized):
-                        realized = close_all_positions(order_manager, connector, superbot=superbot)
+                        realized = close_all_positions(order_manager, connector, superbot=superbot, symbol_last_close_time=symbol_last_close_time)
                         profit_manager.record_cycle_close(realized)
                         notifier.notify_error(
                             f"Ciclu complet! Profit: +{realized:.2f} EUR | "
@@ -378,6 +387,8 @@ def main():
                                         )
                                     except Exception as e:
                                         logger.error(f"SuperBot on_trade_closed error: {e}")
+                                # Cooldown per-simbol
+                                symbol_last_close_time[pos["symbol"]] = time.time()
 
                     # Reincarca pozitii dupa trailing closes
                     open_positions = order_manager.get_open_positions()
@@ -391,6 +402,13 @@ def main():
                     timeframe = strat_info["timeframe"]
 
                     for symbol in symbols:
+                        # Cooldown check — nu re-intra pe simbol daca s-a inchis recent
+                        last_close = symbol_last_close_time.get(symbol, 0)
+                        if time.time() - last_close < position_cooldown:
+                            remaining = int(position_cooldown - (time.time() - last_close))
+                            logger.debug(f"[COOLDOWN] {symbol}: astept inca {remaining}s")
+                            continue
+
                         # News blackout check
                         is_blackout, blackout_reason = news_calendar.is_news_blackout(symbol)
                         if is_blackout:

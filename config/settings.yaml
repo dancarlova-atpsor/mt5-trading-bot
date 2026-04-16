@@ -31,7 +31,7 @@ execution:
   signal_timeout: 30          # Timeout asteptare confirmare EA (secunde)
 
 schedule:
-  check_interval_seconds: 60      # Verifica o data pe minut (nu la 10 sec)
+  check_interval_seconds: 120     # Verifica la 2 min (era 60s — reduce re-entry rapid + comisioane)
   trading_hours: "00:00-23:59"    # 24/24 luni-vineri
   timezone: "Europe/Bucharest"
 
@@ -43,6 +43,8 @@ notifications:
     notify_trades: true       # Notificare la fiecare tranzactie
     notify_daily: true        # Raport zilnic automat
     notify_errors: true       # Alerte erori si stop
+
+position_cooldown_seconds: 300    # 5 min cooldown pe simbol dupa close (evita re-entry rapid)
 
 profit_manager:
   trailing_activation_eur: 40     # Activare trailing la +40 EUR (era 30)

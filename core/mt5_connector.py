@@ -24,26 +24,96 @@ class MT5Connector:
         return self._connected
 
     def connect(self) -> bool:
-        """Initializeaza MT5 si face login pe cont."""
+        """Initializeaza MT5 si face login pe cont.
+
+        Daca terminalul e deja logat pe contul nostru (parola salvata), saltam peste
+        mt5.login() explicit — nu mai cere parola din env.
+
+        Incearca 2 cai:
+        1. mt5.initialize() — attach la terminalul default (functioneaza cand exista un singur terminal)
+        2. mt5.initialize(path=...) — path explicit catre executabilul terminalului (fallback)
+        """
         logger.info("Initializez MetaTrader 5...")
 
-        if not mt5.initialize():
-            logger.error(f"MT5 initialize() a esuat: {mt5.last_error()}")
+        import os
+        account = self.account_config["number"]
+        server = self.account_config["server"]
+        terminal_path = self.account_config.get("terminal_path") or os.environ.get(
+            "MT5_TERMINAL_PATH",
+            r"C:\Program Files\Earn Broker MT5 Terminal\terminal64.exe",
+        )
+
+        # Incercam 3 strategii de initializare, in ordine:
+        attempts = [
+            ("default (running terminal)", {}),
+            ("path explicit", {"path": terminal_path} if os.path.exists(terminal_path) else None),
+            ("path + login + server (saved password)", {
+                "path": terminal_path, "login": account, "server": server, "timeout": 60000
+            } if os.path.exists(terminal_path) else None),
+        ]
+
+        initialized = False
+        for label, kwargs in attempts:
+            if kwargs is None:
+                continue
+            logger.info(f"Incerc: {label}")
+            try:
+                if mt5.initialize(**kwargs):
+                    initialized = True
+                    logger.info(f"MT5 initialize OK via: {label}")
+                    break
+                else:
+                    logger.warning(f"  → esuat: {mt5.last_error()}")
+            except Exception as e:
+                logger.warning(f"  → exceptie: {e}")
+
+        if not initialized:
+            logger.error(
+                f"MT5 initialize() a esuat prin toate metodele. Ultima eroare: {mt5.last_error()}\n"
+                f"Verifica:\n"
+                f"  1. MT5 terminal ruleaza si e logat pe {account}\n"
+                f"  2. Unelte → Optiuni → Expert Advisors → 'Permite tranzactionare algoritmica' BIFAT\n"
+                f"  3. Daca MT5 ruleaza ca Administrator, porneste Python tot ca Admin (PowerShell Run as Admin)"
+            )
             return False
 
         account = self.account_config["number"]
         server = self.account_config["server"]
-        password = self.account_config.get("password") or get_mt5_password()
 
-        logger.info(f"Login pe contul {account} @ {server}...")
-        if not mt5.login(account, password=password, server=server):
-            logger.error(f"Login esuat: {mt5.last_error()}")
-            mt5.shutdown()
-            return False
+        # Verifica daca terminalul e deja logat pe contul dorit
+        current = mt5.account_info()
+        if current is not None and current.login == account:
+            logger.info(f"Terminal deja logat pe contul {account} — skip login explicit")
+        else:
+            # Altfel, incearca login explicit (cere parola din env / config)
+            try:
+                password = self.account_config.get("password") or get_mt5_password()
+            except EnvironmentError as e:
+                logger.error(
+                    f"Terminal NU e logat pe {account} si nu am parola: {e}\n"
+                    f"Solutii: (1) logheaza-te manual in MT5 pe {account} cu Salveaza parola, "
+                    f"sau (2) seteaza $env:MT5_PASSWORD"
+                )
+                mt5.shutdown()
+                return False
+
+            logger.info(f"Login pe contul {account} @ {server}...")
+            if not mt5.login(account, password=password, server=server):
+                logger.error(f"Login esuat: {mt5.last_error()}")
+                mt5.shutdown()
+                return False
 
         account_info = mt5.account_info()
         if account_info is None:
             logger.error("Nu pot obtine informatii despre cont.")
+            mt5.shutdown()
+            return False
+
+        if account_info.login != account:
+            logger.error(
+                f"Terminal e pe alt cont ({account_info.login}), nu {account}. "
+                f"Logheaza-te manual in MT5 pe contul corect si reporneste."
+            )
             mt5.shutdown()
             return False
 

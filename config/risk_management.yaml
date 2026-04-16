@@ -26,7 +26,7 @@ stop_loss:
       pips: 15              # 15 centi SL = ~150 EUR risc pe 0.2 lot
 
 take_profit:
-  risk_reward_ratio: 2.0    # TP = SL * ratio
+  risk_reward_ratio: 3.0    # TP = SL * 3 (era 2.0, crescut pt mai mult profit/trade vs comision)
   use_atr: true
   atr_multiplier: 3.0
 
@@ -39,5 +39,5 @@ limits:
   max_open_positions: 5           # Max 5 pozitii simultan (cate una per simbol)
   max_positions_per_symbol: 1     # Doar 1 pozitie per simbol (evita stacking)
   max_daily_loss_percent: 2.0    # Opreste botul daca pierde 2% azi
-  max_daily_trades: 15            # Max 15 tranzactii/zi pe 5 simboluri
+  max_daily_trades: 8             # Redus de la 15 — forteaza selectivitate, reduce comisioane
   max_correlation_exposure: 3    # Max pozitii pe perechi corelate
