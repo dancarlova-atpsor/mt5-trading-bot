@@ -4,14 +4,14 @@
 
 position_sizing:
   method: "percent_risk"    # "fixed_lot" sau "percent_risk"
-  risk_per_trade: 1.0       # 1% din cont per tranzactie (agresiv pt target 300/zi)
+  risk_per_trade: 0.3       # 0.3% din cont per tranzactie (~$300 risc pe $100k, conservator)
+  max_risk_per_trade_usd: 30  # Cap hard $30 USD risc per trade (sub limita zilnica -$53)
   fixed_lot: 0.01           # Lot fix (daca method = fixed_lot)
-  max_lot: 1.0              # Lot maxim permis (safety cap)
+  max_lot: 0.5              # Lot maxim permis (redus de la 1.0)
 
   # Volum fix per simbol (override pe calculul automat)
   volume_overrides:
-    XAGUSD.cfd: 0.12        # Redus de la 0.2 dupa overnight test (too many SL-hits).
-                            # Cu SuperBot size_mult 1.3x → 0.156 efectiv (~0.15).
+    XAUUSD.cfd: 0.05        # Aur - spread 0, ATR ~13 pips pe H1. Volum mic pt safety.
 
 stop_loss:
   default_pips: 50
@@ -20,10 +20,8 @@ stop_loss:
   atr_period: 14
 
   # Override SL per simbol (pips = incrementi minimi)
-  # Pentru simboluri unde ATR e prea larg
-  symbol_overrides:
-    XAGUSD.cfd:
-      pips: 15              # 15 centi SL = ~150 EUR risc pe 0.2 lot
+  # Pentru simboluri unde vrem SL fix, nu ATR-based
+  symbol_overrides: {}     # XAGUSD scos; XAUUSD foloseste ATR*1.5 default (bun)
 
 take_profit:
   risk_reward_ratio: 3.0    # TP = SL * 3 (era 2.0, crescut pt mai mult profit/trade vs comision)

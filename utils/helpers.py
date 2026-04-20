@@ -34,11 +34,22 @@ def is_trading_hours(trading_hours: str, timezone_str: str = "Europe/Bucharest")
 
 def pips_to_price(symbol: str, pips: float) -> float:
     """Converteste pips in diferenta de pret.
+    Stocks (contract=100, digits=2): 1 pip = 0.01 ($0.01 = 1 cent)
     JPY pairs: 1 pip = 0.01
     Metale (XAU/XAG): 1 pip = 0.01
-    Crypto (BTC/ETH/SOL): 1 pip = 1.0 (pret in USD intreg)
+    Crypto (BTC/ETH/SOL): 1 pip = 1.0 / 0.1 / 0.01
     Forex standard: 1 pip = 0.0001
     """
+    # Incearca prin MT5 symbol_info (cea mai corecta detectie)
+    try:
+        import MetaTrader5 as mt5
+        info = mt5.symbol_info(symbol)
+        if info and info.trade_contract_size == 100 and info.digits == 2:
+            # Stock CFD: 1 pip = 1 cent
+            return pips * 0.01
+    except Exception:
+        pass
+
     symbol_upper = symbol.upper()
     if "JPY" in symbol_upper:
         return pips * 0.01

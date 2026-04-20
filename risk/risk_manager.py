@@ -63,6 +63,12 @@ class RiskManager:
         risk_per_trade = self.position_sizing["risk_per_trade"]
         risk_amount = account_balance * (risk_per_trade / 100)
 
+        # Cap absolut pe risk in USD (sa nu depaseasca limita zilnica)
+        max_risk_usd = self.position_sizing.get("max_risk_per_trade_usd", 0)
+        if max_risk_usd > 0 and risk_amount > max_risk_usd:
+            logger.debug(f"Risk clamp: {risk_amount:.2f} → {max_risk_usd} USD (max_risk_per_trade_usd)")
+            risk_amount = max_risk_usd
+
         if stop_loss_pips <= 0:
             logger.warning("SL pips <= 0, folosesc lot minim 0.01")
             return 0.01

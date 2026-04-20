@@ -3,9 +3,10 @@ Notificari Telegram pentru Trading Bot MT5.
 Trimite alerte la tranzactii, erori si raport zilnic.
 """
 
-import asyncio
 import os
 from datetime import datetime
+
+import requests
 
 from utils.logger import setup_logger
 from utils.helpers import load_config
@@ -14,7 +15,7 @@ logger = setup_logger("notifier")
 
 
 class TelegramNotifier:
-    """Trimite notificari prin Telegram Bot API."""
+    """Trimite notificari prin Telegram Bot API (sync, via requests)."""
 
     def __init__(self):
         config = load_config("settings.yaml")
@@ -27,36 +28,26 @@ class TelegramNotifier:
         self.notify_daily = tg_config.get("notify_daily", True)
         self.notify_errors = tg_config.get("notify_errors", True)
 
-        self._bot = None
-
         if self.enabled and self.bot_token and self.chat_id:
-            try:
-                from telegram import Bot
-                self._bot = Bot(token=self.bot_token)
-                logger.info("Telegram notifier activ")
-            except ImportError:
-                logger.warning("python-telegram-bot nu e instalat. pip install python-telegram-bot")
-                self.enabled = False
+            self._api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+            logger.info("Telegram notifier activ")
         elif self.enabled:
             logger.warning("Telegram enabled dar bot_token/chat_id lipsesc. Dezactivat.")
             self.enabled = False
 
     def _send(self, text: str):
-        """Trimite mesaj pe Telegram (sync wrapper peste async)."""
-        if not self.enabled or not self._bot:
+        """Trimite mesaj pe Telegram via HTTP POST (sync, fara asyncio)."""
+        if not self.enabled:
             return
 
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(
-                self._bot.send_message(
-                    chat_id=self.chat_id,
-                    text=text,
-                    parse_mode="Markdown",
-                )
-            )
-            loop.close()
+            resp = requests.post(self._api_url, json={
+                "chat_id": self.chat_id,
+                "text": text,
+                "parse_mode": "Markdown",
+            }, timeout=10)
+            if not resp.ok:
+                logger.error(f"Telegram HTTP {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
             logger.error(f"Eroare trimitere Telegram: {e}")
 

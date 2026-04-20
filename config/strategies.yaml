@@ -5,14 +5,16 @@
 trend_following:
   enabled: true
   timeframe: "H1"
-  # Grid search a confirmat: EMA 20/50 ADX 25 e optim pe EURUSD, AUDUSD
-  # EURGBP include ca diversificare (TF PF 1.08 pe 3 luni)
-  # XAGUSD include din istoric real 95.8% win rate
+  # Backtest 90d (2026-04-17): EMA 20/50 ADX 25 RR 3.0 este optim
+  # XAGUSD SCOS (ATR 0.6 vs SL 0.15 = disaster), GBPUSD SCOS (-$1846 in backtest)
+  # NOI: XAUUSD (+$12133!), USDCHF (+$2582), USDCAD (+$1495)
   symbols:
-    - EURUSD.cfd
-    - AUDUSD.cfd
-    - EURGBP.cfd
-    - XAGUSD.cfd
+    - EURUSD.cfd     # +$4671
+    - AUDUSD.cfd     # +$2584
+    - EURGBP.cfd     # +$740
+    - XAUUSD.cfd     # +$12133 ← TOP performer
+    - USDCHF.cfd     # +$2582
+    - USDCAD.cfd     # +$1495
   ema_fast: 20
   ema_slow: 50
   macd_fast: 12
@@ -24,24 +26,23 @@ trend_following:
 breakout:
   enabled: true
   timeframe: "H1"
-  # Grid search: Breakout LB50 Vol2.0 → GBPUSD PF 1.59 (cel mai bun!)
+  # Backtest 90d: GBPUSD +$2149 (WR 40% PF 2.20), EURUSD +$1584 (WR 44% PF 2.18)
   symbols:
     - GBPUSD.cfd
-  lookback_period: 50        # OPTIMIZAT (era 20)
+    - EURUSD.cfd
+  lookback_period: 50
   atr_period: 14
   min_atr_ratio: 0.8
   min_vol_ratio: 2.0         # OPTIMIZAT (era 1.2)
 
 macd_divergence:
-  enabled: true              # Reactivat cu parametri RELAXATI pentru mai multe semnale
+  enabled: false             # Dezactivat 2026-04-17: backtest arata 0-1 trade pe simbol, pierdere
   timeframe: "H1"
-  # Pe simbolurile TOP 5 (complementar cu TrendFollowing/Breakout)
   symbols:
     - EURUSD.cfd
     - AUDUSD.cfd
     - GBPUSD.cfd
     - EURGBP.cfd
-    - XAGUSD.cfd
   macd_fast: 12
   macd_slow: 26
   macd_signal: 9
@@ -51,13 +52,10 @@ macd_divergence:
   divergence_lookback: 25    # RELAXAT (era 30) — divergente mai recente
 
 news_sentiment:
-  enabled: true
+  enabled: false             # Dezactivat 2026-04-17: sentiment a dus la pierderi overnight
   timeframe: "H1"
-  # Confirmare secundara pe TOP 5
   symbols:
     - EURUSD.cfd
-    - GBPUSD.cfd
-    - XAGUSD.cfd
   min_articles: 3
   min_score: 0.3
 

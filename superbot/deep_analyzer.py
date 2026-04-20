@@ -207,8 +207,10 @@ class DeepAnalyzer(threading.Thread):
         else:
             candidates = list(self.strategies_map.keys())
 
-        # Gaseste primul candidat care are simbolul in config si e enabled
+        # Gaseste primul candidat care e (1) in active strategies_map, (2) enabled, (3) are simbolul
         for cand in candidates:
+            if cand not in self.strategies_map:
+                continue  # Strategia nu e activa (nu e in active_strategies)
             cfg = self.strategies_config.get(cand, {})
             if not cfg.get("enabled", False):
                 continue

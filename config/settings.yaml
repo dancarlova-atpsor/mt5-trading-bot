@@ -10,19 +10,22 @@ account:
   magic_number: 123456      # ID unic pentru ordinele botului
 
 symbols:
-  # TOP 5 dupa analiza 6m/3m/1m + grid search parametri
-  - EURUSD.cfd       # TF 20/50 ADX25, PF 1.53, WR 43%, PnL +846
-  - AUDUSD.cfd       # TF 20/50 ADX25, PF 1.41, WR 42%, PnL +652
-  - GBPUSD.cfd       # Breakout LB50 Vol2.0, PF 1.59, PnL +150
-  - XAGUSD.cfd       # Istoric real 95.8% win, SL 15c strans
-  - EURGBP.cfd       # TF PF 1.08, swap mic, stabil
+  # FOREX only — backtest 90d RR=3.0 confirma profitabilitatea
+  # Stocks NU, nu merge cu strategiile actuale (WR 15-29%). Vom face faza 2 dedicata.
+  - EURUSD.cfd       # TF +$4671 | Breakout +$1584
+  - AUDUSD.cfd       # TF +$2584 (WR 38%)
+  - GBPUSD.cfd       # NUMAI Breakout +$2149 (TF pierde)
+  - EURGBP.cfd       # TF +$740 (swap mic, stabil)
+  - XAUUSD.cfd       # TF +$12133! SPREAD 0 (aur in loc de argint)
+  - USDCHF.cfd       # TF +$2582 (WR 32%)
+  - USDCAD.cfd       # TF +$1495 (stabil)
 
 active_strategies:
   - trend_following
-  - news_sentiment
   - breakout
-  - macd_divergence
-  # - mean_reversion        # Dezactivat — pierde pe piata actuala
+  # - news_sentiment        # Dezactivat 2026-04-17: overnight a dus la pierderi
+  # - macd_divergence       # Dezactivat: backtest 0-1 trade/simbol, nu produce signal
+  # - mean_reversion
   # - scalping
 
 execution:

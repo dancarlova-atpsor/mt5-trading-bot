@@ -143,7 +143,8 @@ class SuperBot:
             if not plan.get("enabled", True):
                 return False, 0.0, f"plan: {plan.get('reason', 'disabled')}"
 
-            # Strategy match
+            # Strategy match — pe toate regime-urile forteaza strategia recomandata.
+            # Asigura ca TF ruleaza doar pe TRENDING, Breakout pe volatile etc.
             plan_strategy = plan.get("strategy")
             if plan_strategy and plan_strategy != strategy_name:
                 return False, 0.0, f"plan: wrong strategy (vreau {plan_strategy})"

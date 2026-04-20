@@ -271,6 +271,13 @@ def main():
     trading_hours = schedule.get("trading_hours", "00:00-23:59")
     timezone_str = schedule.get("timezone", "Europe/Bucharest")
 
+    # Config STOCKS (orar limitat NASDAQ + close-before-market-close)
+    stocks_config = settings.get("stocks", {})
+    stock_symbols = set(stocks_config.get("symbols", []))
+    stock_trading_hours = stocks_config.get("trading_hours", "16:30-22:55")
+    stock_close_at = stocks_config.get("close_before_market_close", "")
+    stocks_closed_today = False
+
     outside_hours_logged = False
     daily_report_sent = False
 
@@ -286,6 +293,38 @@ def main():
     try:
         while running:
             try:
+                # Stocks close-before-market-close — inchide DOAR stocks la 22:55 (evita swap -$15/zi)
+                if stock_close_at and stock_symbols:
+                    try:
+                        from datetime import datetime, time as dtime
+                        hh, mm = stock_close_at.split(":")
+                        close_t = dtime(int(hh), int(mm))
+                        now_t = datetime.now().time()
+                        close_window_end = dtime(int(hh), min(int(mm)+5, 59))
+                        if close_t <= now_t <= close_window_end and not stocks_closed_today:
+                            open_list = order_manager.get_open_positions()
+                            stocks_open = [p for p in open_list if p["symbol"] in stock_symbols]
+                            if stocks_open:
+                                logger.info(f"[STOCKS CLOSE {stock_close_at}] Inchid {len(stocks_open)} pozitii stocks (evit swap -$15/zi)")
+                                close_ts = time.time()
+                                for pos in stocks_open:
+                                    result = order_manager.close_position(pos["ticket"], comment="stock_mkt_close")
+                                    if result.success:
+                                        logger.info(f"  Inchis #{pos['ticket']} {pos['symbol']} {pos['volume']}lot PnL {pos['profit']:+.2f}")
+                                        if superbot is not None:
+                                            try:
+                                                superbot.on_trade_closed(symbol=pos["symbol"], strategy=pos.get("comment") or "unknown",
+                                                                          pnl=pos["profit"], closed_at=close_ts)
+                                            except Exception:
+                                                pass
+                                        symbol_last_close_time[pos["symbol"]] = close_ts
+                            stocks_closed_today = True
+                        # Reset flag la schimbare zi (dupa miezul noptii)
+                        if now_t < close_t and stocks_closed_today:
+                            stocks_closed_today = False
+                    except Exception as e:
+                        logger.error(f"stocks close_at error: {e}")
+
                 # Verificare ore de trading
                 if not is_trading_hours(trading_hours, timezone_str):
                     if not outside_hours_logged:
@@ -402,6 +441,12 @@ def main():
                     timeframe = strat_info["timeframe"]
 
                     for symbol in symbols:
+                        # Stock market hours check — stocks doar intre 16:30-22:55 RO
+                        if symbol in stock_symbols:
+                            if not is_trading_hours(stock_trading_hours, timezone_str):
+                                logger.debug(f"[STOCKS HOURS] {symbol}: in afara {stock_trading_hours} — skip")
+                                continue
+
                         # Cooldown check — nu re-intra pe simbol daca s-a inchis recent
                         last_close = symbol_last_close_time.get(symbol, 0)
                         if time.time() - last_close < position_cooldown:
