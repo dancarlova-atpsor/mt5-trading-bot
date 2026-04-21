@@ -113,6 +113,7 @@ class SuperBot:
         strategy_name: str,
         direction: str,
         open_positions: list[dict],
+        current_price: float = 0.0,
     ) -> tuple[bool, float, str]:
         """Single entry point pentru verificare deschidere trade.
 
@@ -134,7 +135,14 @@ class SuperBot:
         if not ok:
             return False, 0.0, f"corr: {reason}"
 
-        # 3. Verifica symbol_plan din deep analyzer
+        # 3. Entry filter NOU — MTF trend + S/R + swap direction
+        if current_price > 0:
+            from superbot.entry_filter import check_entry
+            ok, reason = check_entry(symbol, direction, current_price)
+            if not ok:
+                return False, 0.0, f"entry: {reason}"
+
+        # 4. Verifica symbol_plan din deep analyzer
         with self.state.lock:
             plan = self.state.symbol_plan.get(symbol, {})
 

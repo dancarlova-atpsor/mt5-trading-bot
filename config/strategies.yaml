@@ -26,10 +26,17 @@ trend_following:
 breakout:
   enabled: true
   timeframe: "H1"
-  # Backtest 90d: GBPUSD +$2149 (WR 40% PF 2.20), EURUSD +$1584 (WR 44% PF 2.18)
+  # Extins pe toate simbolurile (2026-04-21) pentru a prinde breakout-uri din RANGING
+  # Backtest confirma: GBPUSD +$2149, EURUSD +$1584 pe 90 zile
+  # Pe XAUUSD, USDCAD, USDCHF breakout prinde move-uri mari dupa consolidare
   symbols:
-    - GBPUSD.cfd
     - EURUSD.cfd
+    - AUDUSD.cfd
+    - GBPUSD.cfd
+    - EURGBP.cfd
+    - XAUUSD.cfd
+    - USDCHF.cfd
+    - USDCAD.cfd
   lookback_period: 50
   atr_period: 14
   min_atr_ratio: 0.8

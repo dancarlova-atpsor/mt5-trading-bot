@@ -489,14 +489,18 @@ def main():
                         if already_open:
                             continue
 
-                        # SuperBot gate — regime + correlation + performance
+                        # SuperBot gate — regime + correlation + performance + MTF/S/R/swap
                         superbot_size_mult = 1.0
                         if superbot is not None:
+                            # Luam current_price pt entry filter
+                            _sym_info = connector.get_symbol_info(symbol)
+                            current_price_hint = (_sym_info["ask"] if direction_str == "BUY" else _sym_info["bid"]) if _sym_info else 0.0
                             ok, size_mult, sb_reason = superbot.gate_trade(
                                 symbol=symbol,
                                 strategy_name=strat_info["name"],
                                 direction=direction_str,
                                 open_positions=open_positions,
+                                current_price=current_price_hint,
                             )
                             if not ok:
                                 logger.info(f"[SuperBot] {symbol}: BLOCKED — {sb_reason}")

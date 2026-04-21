@@ -201,7 +201,8 @@ class DeepAnalyzer(threading.Thread):
         if regime == RegimeType.TRENDING:
             candidates = ["trend_following", "breakout", "macd_divergence"]
         elif regime == RegimeType.RANGING:
-            candidates = ["macd_divergence", "mean_reversion", "news_sentiment"]
+            # Breakout poate prinde breakout-uri din range (catch start of next trend)
+            candidates = ["breakout", "macd_divergence", "mean_reversion", "news_sentiment"]
         elif regime == RegimeType.VOLATILE:
             candidates = ["breakout", "trend_following"]
         else:
