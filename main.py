@@ -475,6 +475,10 @@ def main():
                         if isinstance(strategy, NewsSentiment):
                             strategy.set_current_symbol(symbol)
 
+                        # TrendFollowing: seteaza simbolul pt parametri per-symbol
+                        if isinstance(strategy, TrendFollowing):
+                            strategy.set_current_symbol(symbol)
+
                         # Analiza
                         signal_result = strategy.analyze(data)
                         if signal_result == Signal.HOLD:

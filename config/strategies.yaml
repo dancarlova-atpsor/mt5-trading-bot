@@ -5,16 +5,16 @@
 trend_following:
   enabled: true
   timeframe: "H1"
-  # Backtest 90d (2026-04-17): EMA 20/50 ADX 25 RR 3.0 este optim
-  # XAGUSD SCOS (ATR 0.6 vs SL 0.15 = disaster), GBPUSD SCOS (-$1846 in backtest)
-  # NOI: XAUUSD (+$12133!), USDCHF (+$2582), USDCAD (+$1495)
+  # Grid search 2026-04-21: parametri optimi DIFERITI per simbol.
+  # Total 90d: +$1463 uniform -> +$7238 per-symbol. Imbunatatire +$5775.
   symbols:
-    - EURUSD.cfd     # +$4671
-    - AUDUSD.cfd     # +$2584
-    - EURGBP.cfd     # +$740
-    - XAUUSD.cfd     # +$12133 ← TOP performer
-    - USDCHF.cfd     # +$2582
-    - USDCAD.cfd     # +$1495
+    - EURUSD.cfd
+    - AUDUSD.cfd
+    - EURGBP.cfd
+    - XAUUSD.cfd
+    - USDCHF.cfd
+    - USDCAD.cfd
+  # Defaults (folosit daca simbolul nu are override)
   ema_fast: 20
   ema_slow: 50
   macd_fast: 12
@@ -22,6 +22,27 @@ trend_following:
   macd_signal: 9
   adx_threshold: 25
   adx_period: 14
+  # Override per simbol (din grid search) - DOAR parametrii care difera de default
+  symbol_overrides:
+    # EURUSD.cfd: default 20/50/25 deja optim
+    AUDUSD.cfd:
+      ema_fast: 15
+      ema_slow: 70      # Best +$167 vs +$108 default
+    EURGBP.cfd:
+      ema_fast: 15
+      ema_slow: 70
+      adx_threshold: 30  # Best +$130 vs +$80
+    XAUUSD.cfd:
+      ema_fast: 10
+      ema_slow: 70
+      adx_threshold: 30  # Best +$5598! vs +$655 — cea mai mare imbunatatire
+    USDCHF.cfd:
+      ema_fast: 10
+      ema_slow: 30       # Best +$185 vs +$93
+    USDCAD.cfd:
+      ema_fast: 15
+      ema_slow: 70
+      adx_threshold: 18  # Best +$736 vs +$105 — ADX mai relaxat
 
 breakout:
   enabled: true

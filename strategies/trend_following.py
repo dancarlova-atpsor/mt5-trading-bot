@@ -13,25 +13,39 @@ logger = setup_logger("trend_following")
 
 
 class TrendFollowing(BaseStrategy):
-    """Trend Following cu EMA, MACD si ADX."""
+    """Trend Following cu EMA, MACD si ADX. Suporta parametri per-simbol."""
 
     def __init__(self, params: dict):
         super().__init__("TrendFollowing", params)
+        self._current_symbol = None
+        self._symbol_overrides = params.get("symbol_overrides", {}) or {}
+
+    def set_current_symbol(self, symbol: str):
+        """Setare simbol curent pentru a aplica parametri specifici (override)."""
+        self._current_symbol = symbol
+
+    def _p(self, key: str):
+        """Intoarce valoarea parametrului, cu override per simbol daca exista."""
+        if self._current_symbol and self._current_symbol in self._symbol_overrides:
+            override = self._symbol_overrides[self._current_symbol]
+            if key in override:
+                return override[key]
+        return self.params[key]
 
     def calculate_indicators(self, data: pd.DataFrame) -> pd.DataFrame:
         """Calculeaza EMA fast/slow, MACD histogram, ADX."""
         df = data.copy()
 
         # EMA
-        df["ema_fast"] = ta.ema(df["close"], length=self.params["ema_fast"])
-        df["ema_slow"] = ta.ema(df["close"], length=self.params["ema_slow"])
+        df["ema_fast"] = ta.ema(df["close"], length=self._p("ema_fast"))
+        df["ema_slow"] = ta.ema(df["close"], length=self._p("ema_slow"))
 
         # MACD
         macd_df = ta.macd(
             df["close"],
-            fast=self.params["macd_fast"],
-            slow=self.params["macd_slow"],
-            signal=self.params["macd_signal"],
+            fast=self._p("macd_fast"),
+            slow=self._p("macd_slow"),
+            signal=self._p("macd_signal"),
         )
         if macd_df is not None:
             # Coloana histogram contine "MACDh" in nume
@@ -43,7 +57,7 @@ class TrendFollowing(BaseStrategy):
         # ADX
         adx_df = ta.adx(
             df["high"], df["low"], df["close"],
-            length=self.params["adx_period"],
+            length=self._p("adx_period"),
         )
         if adx_df is not None:
             df["adx"] = adx_df.iloc[:, 0]  # ADX
@@ -61,7 +75,7 @@ class TrendFollowing(BaseStrategy):
         if last[["ema_fast", "ema_slow", "macd_hist", "adx"]].isna().any():
             return Signal.HOLD
 
-        adx_strong = last["adx"] > self.params["adx_threshold"]
+        adx_strong = last["adx"] > self._p("adx_threshold")
 
         # BUY: pret > EMA slow, EMA fast > EMA slow, MACD hist > 0, ADX puternic
         if (
