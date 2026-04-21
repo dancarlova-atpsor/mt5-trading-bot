@@ -135,12 +135,19 @@ class SuperBot:
         if not ok:
             return False, 0.0, f"corr: {reason}"
 
-        # 3. Entry filter NOU — MTF trend + S/R + swap direction
-        if current_price > 0:
+        # 3. Entry filter — MTF trend + S/R + swap direction
+        # Backtest 90d arata: filter SALVEAZA pe Breakout (+$1427 total),
+        # dar STRICA pe TrendFollow (blocheaza prea multe trade-uri bune)
+        # → Aplic filter DOAR pe breakout; TrendFollow merge liber
+        FILTER_STRATEGIES = {"breakout"}
+        if current_price > 0 and strategy_name in FILTER_STRATEGIES:
             from superbot.entry_filter import check_entry
             ok, reason = check_entry(symbol, direction, current_price)
             if not ok:
                 return False, 0.0, f"entry: {reason}"
+        # XAUUSD swap filter se aplica MEREU (nu doar pe breakout) — e critic
+        if symbol == "XAUUSD.cfd" and direction.upper() == "BUY":
+            return False, 0.0, "swap: XAUUSD BUY = -$61/noapte, blocat mereu"
 
         # 4. Verifica symbol_plan din deep analyzer
         with self.state.lock:
