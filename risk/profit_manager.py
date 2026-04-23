@@ -83,12 +83,33 @@ class ProfitManager:
             return True, f"Pierdere zilnica maxima atinsa: {self._daily_realized:.2f} EUR"
         return False, ""
 
+    def _get_trail_pct_for_peak(self, peak: float) -> float:
+        """Tier-based trailing percentage in functie de peak profit atins.
+
+        Filosofie: profituri mici → lock agresiv (sigur).
+                   profituri mari → lasi trend-ul sa curga.
+        """
+        if peak < 20:
+            return 0  # No trail, doar SL clasic
+        elif peak < 50:
+            return 50  # Lock 50% peak (ex: peak 40 → close la 20)
+        elif peak < 100:
+            return 35  # Lock 65% peak (ex: peak 80 → close la 52)
+        else:
+            return 25  # Lock 75% peak (ex: peak 150 → close la 112)
+
     def check_position_trailing(self, ticket: int, current_profit: float) -> bool:
-        """Verifica daca o pozitie trebuie inchisa pe trailing profit.
+        """Verifica daca o pozitie trebuie inchisa pe trailing profit (tier-based).
+
+        Tier rules:
+          < $20:    fara trail
+          $20-$50:  trail 50% (lock 50% peak)
+          $50-$100: trail 35% (lock 65% peak)
+          > $100:   trail 25% (lock 75% peak)
 
         Args:
             ticket: Ticket-ul pozitiei
-            current_profit: Profitul curent in EUR/USD
+            current_profit: Profitul curent in USD
 
         Returns:
             True daca pozitia trebuie inchisa
@@ -99,22 +120,27 @@ class ProfitManager:
             self._peak_profit[ticket] = current_profit
 
         peak = self._peak_profit.get(ticket, 0)
+        if peak <= 0:
+            return False
 
-        # Activeaza trailing daca profitul a atins pragul
-        if current_profit >= self.trailing_activation and not self._trailing_active.get(ticket):
+        # Tier-based trail percent (depinde de peak atins)
+        trail_pct = self._get_trail_pct_for_peak(peak)
+
+        # Activare: cand peak depaseste primul tier ($20)
+        if peak >= 20 and not self._trailing_active.get(ticket):
             self._trailing_active[ticket] = True
             logger.info(
-                f"Trailing ACTIVAT pe #{ticket} — profit: +{current_profit:.2f} EUR "
-                f"(prag: +{self.trailing_activation} EUR)"
+                f"Trailing ACTIVAT pe #{ticket} — peak: +{peak:.2f}, "
+                f"tier trail: {trail_pct}% (close la +{peak * (1 - trail_pct/100):.2f})"
             )
 
-        # Daca trailing e activ, verifica daca profitul a scazut prea mult
-        if self._trailing_active.get(ticket) and peak > 0:
-            trail_level = peak * (1 - self.trailing_percent / 100)
+        # Verifica daca profitul a scazut sub trail level
+        if self._trailing_active.get(ticket) and trail_pct > 0:
+            trail_level = peak * (1 - trail_pct / 100)
             if current_profit <= trail_level:
                 logger.info(
-                    f"TRAILING CLOSE #{ticket} — profit: +{current_profit:.2f} EUR "
-                    f"(peak: +{peak:.2f}, trail level: +{trail_level:.2f})"
+                    f"TRAILING CLOSE #{ticket} — profit: +{current_profit:.2f} "
+                    f"(peak: +{peak:.2f}, tier {trail_pct}%, trail level: +{trail_level:.2f})"
                 )
                 return True
 
