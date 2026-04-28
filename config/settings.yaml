@@ -10,15 +10,12 @@ account:
   magic_number: 123456      # ID unic pentru ordinele botului
 
 symbols:
-  # FOREX only — backtest 90d RR=3.0 confirma profitabilitatea
-  # Stocks NU, nu merge cu strategiile actuale (WR 15-29%). Vom face faza 2 dedicata.
-  - EURUSD.cfd       # TF +$4671 | Breakout +$1584
-  - AUDUSD.cfd       # TF +$2584 (WR 38%)
-  - GBPUSD.cfd       # NUMAI Breakout +$2149 (TF pierde)
-  - EURGBP.cfd       # TF +$740 (swap mic, stabil)
-  - XAUUSD.cfd       # TF +$12133! SPREAD 0 (aur in loc de argint)
-  - USDCHF.cfd       # TF +$2582 (WR 32%)
-  - USDCAD.cfd       # TF +$1495 (stabil)
+  # CONFIG REAL TEST 5300 EUR — 4 simboluri castigatoare confirmate live
+  # Scoase: AUDUSD (-$601), EURGBP (-$366), EURUSD (marginal -$6)
+  - XAUUSD.cfd       # +$150 net real (13 trades), comision minim $0.10/lot
+  - USDCHF.cfd       # marginal pozitiv, swap BUY OK
+  - USDCAD.cfd       # bun pe TF cu params 15/70/18
+  - GBPUSD.cfd       # doar Breakout
 
 active_strategies:
   - trend_following

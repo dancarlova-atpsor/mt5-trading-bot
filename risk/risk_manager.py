@@ -61,7 +61,13 @@ class RiskManager:
 
         # Metoda percent_risk
         risk_per_trade = self.position_sizing["risk_per_trade"]
-        risk_amount = account_balance * (risk_per_trade / 100)
+
+        # Simulated balance — pt test "ca si cum am avea cont real" cu balance specific
+        # Daca e setat, ignoram balance-ul real si folosim sim_balance pt calcul
+        sim_balance = self.position_sizing.get("simulated_balance", 0)
+        balance_for_calc = sim_balance if sim_balance > 0 else account_balance
+
+        risk_amount = balance_for_calc * (risk_per_trade / 100)
 
         # Cap absolut pe risk in USD (sa nu depaseasca limita zilnica)
         max_risk_usd = self.position_sizing.get("max_risk_per_trade_usd", 0)

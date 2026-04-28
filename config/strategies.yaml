@@ -8,10 +8,8 @@ trend_following:
   # Grid search 2026-04-21: parametri optimi DIFERITI per simbol.
   # Total 90d: +$1463 uniform -> +$7238 per-symbol. Imbunatatire +$5775.
   symbols:
-    - EURUSD.cfd
-    - AUDUSD.cfd
-    - EURGBP.cfd
-    - XAUUSD.cfd
+    # CONFIG REAL 5300 EUR — doar 3 simboluri TF castigatoare
+    - XAUUSD.cfd     # SELL only (filter swap)
     - USDCHF.cfd
     - USDCAD.cfd
   # Defaults (folosit daca simbolul nu are override)
@@ -47,15 +45,10 @@ trend_following:
 breakout:
   enabled: true
   timeframe: "H1"
-  # Extins pe toate simbolurile (2026-04-21) pentru a prinde breakout-uri din RANGING
-  # Backtest confirma: GBPUSD +$2149, EURUSD +$1584 pe 90 zile
-  # Pe XAUUSD, USDCAD, USDCHF breakout prinde move-uri mari dupa consolidare
+  # CONFIG REAL 5300 EUR — 4 simboluri (mai putin EURUSD, AUDUSD, EURGBP)
   symbols:
-    - EURUSD.cfd
-    - AUDUSD.cfd
-    - GBPUSD.cfd
-    - EURGBP.cfd
-    - XAUUSD.cfd
+    - GBPUSD.cfd     # Breakout +$2149 backtest 90d
+    - XAUUSD.cfd     # SELL only via filter
     - USDCHF.cfd
     - USDCAD.cfd
   lookback_period: 50

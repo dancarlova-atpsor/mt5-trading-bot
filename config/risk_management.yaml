@@ -4,14 +4,15 @@
 
 position_sizing:
   method: "percent_risk"    # "fixed_lot" sau "percent_risk"
-  risk_per_trade: 0.3       # 0.3% din cont per tranzactie (~$300 risc pe $100k, conservator)
-  max_risk_per_trade_usd: 30  # Cap hard $30 USD risc per trade (sub limita zilnica -$53)
+  risk_per_trade: 0.5       # 0.5% per trade = €26 pe cont 5300 EUR
+  simulated_balance: 5700   # USD echivalent 5300 EUR — toate calculele lot folosesc asta in loc de balance demo
+  max_risk_per_trade_usd: 28  # Cap hard $28 USD risc per trade (~€26)
   fixed_lot: 0.01           # Lot fix (daca method = fixed_lot)
-  max_lot: 0.5              # Lot maxim permis (redus de la 1.0)
+  max_lot: 0.10             # Max 0.10 lot pe cont 5300 EUR (siguranta)
 
   # Volum fix per simbol (override pe calculul automat)
   volume_overrides:
-    XAUUSD.cfd: 0.05        # Aur - spread 0, ATR ~13 pips pe H1. Volum mic pt safety.
+    XAUUSD.cfd: 0.02        # Aur — volum redus pt cont mic (era 0.05 pe demo $98k)
 
 stop_loss:
   default_pips: 50
@@ -34,8 +35,8 @@ trailing_stop:
   trail_pips: 15            # Distanta de trailing
 
 limits:
-  max_open_positions: 5           # Max 5 pozitii simultan (cate una per simbol)
+  max_open_positions: 3           # Max 3 pozitii simultan (cont mic)
   max_positions_per_symbol: 1     # Doar 1 pozitie per simbol (evita stacking)
-  max_daily_loss_percent: 2.0    # Opreste botul daca pierde 2% azi
-  max_daily_trades: 8             # Redus de la 15 — forteaza selectivitate, reduce comisioane
-  max_correlation_exposure: 3    # Max pozitii pe perechi corelate
+  max_daily_loss_percent: 1.0    # Opreste botul daca pierde 1% azi (~€53 pe 5300)
+  max_daily_trades: 3             # Max 3 trade-uri/zi (reduce overtrading)
+  max_correlation_exposure: 2    # Max 2 pozitii pe perechi corelate
