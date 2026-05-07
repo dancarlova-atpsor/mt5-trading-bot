@@ -460,6 +460,18 @@ def main():
                             logger.info(f"[NEWS BLACKOUT] {symbol}: {blackout_reason} — skip")
                             continue
 
+                        # Earnings blackout (doar pentru stocks cu earnings calendar)
+                        if symbol in stock_symbols:
+                            try:
+                                from superbot.entry_filter import check_earnings_blackout
+                                blackout_days = stocks_config.get("earnings_blackout_days", 2)
+                                eb, eb_reason = check_earnings_blackout(symbol, blackout_days=blackout_days)
+                                if eb:
+                                    logger.info(f"[EARNINGS BLACKOUT] {symbol}: {eb_reason} — skip")
+                                    continue
+                            except Exception as e:
+                                logger.debug(f"earnings blackout check error pe {symbol}: {e}")
+
                         # Fetch date
                         data = data_fetcher.get_rates(symbol, timeframe, bars=500)
                         if data is None or len(data) < 60:

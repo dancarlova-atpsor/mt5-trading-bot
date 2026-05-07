@@ -72,6 +72,19 @@ class SuperBot:
         self.symbols = symbols
         self._iter_counter = 0
 
+        # Per-symbol D1 filter list — extras din strategies.yaml symbol_overrides
+        # Folosit selectiv: doar simbolurile cu d1_filter:true sunt verificate
+        self.d1_filter_symbols: set = set()
+        try:
+            tf_cfg = strategies_config.get("trend_following", {}) if strategies_config else {}
+            for sym, ovr in (tf_cfg.get("symbol_overrides") or {}).items():
+                if isinstance(ovr, dict) and ovr.get("d1_filter"):
+                    self.d1_filter_symbols.add(sym)
+            if self.d1_filter_symbols:
+                logger.info(f"D1 filter activ pentru: {sorted(self.d1_filter_symbols)}")
+        except Exception as e:
+            logger.error(f"D1 filter setup error: {e}")
+
         if self.enabled:
             logger.info(
                 f"SuperBot INITIALIZED | {len(symbols)} simboluri | "
@@ -148,6 +161,13 @@ class SuperBot:
         # XAUUSD swap filter se aplica MEREU (nu doar pe breakout) — e critic
         if symbol == "XAUUSD.cfd" and direction.upper() == "BUY":
             return False, 0.0, "swap: XAUUSD BUY = -$61/noapte, blocat mereu"
+
+        # D1 filter selectiv (din strategies.yaml symbol_overrides[sym].d1_filter:true)
+        if symbol in self.d1_filter_symbols:
+            from superbot.entry_filter import check_d1_alignment
+            ok, reason = check_d1_alignment(symbol, direction)
+            if not ok:
+                return False, 0.0, f"d1_filter: {reason}"
 
         # 4. Verifica symbol_plan din deep analyzer
         with self.state.lock:

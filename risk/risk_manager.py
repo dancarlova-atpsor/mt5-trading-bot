@@ -173,9 +173,13 @@ class RiskManager:
     def calculate_take_profit(
         self, entry_price: float, stop_loss: float, direction: str, symbol: str = ""
     ) -> float:
-        """Calculeaza Take Profit pe baza risk-reward ratio."""
+        """Calculeaza Take Profit pe baza risk-reward ratio.
+        Suporta override per simbol via take_profit.symbol_rr_overrides in config.
+        """
         sl_distance = abs(entry_price - stop_loss)
-        tp_distance = sl_distance * self.take_profit_config["risk_reward_ratio"]
+        rr_overrides = self.take_profit_config.get("symbol_rr_overrides", {}) or {}
+        rr = rr_overrides.get(symbol, self.take_profit_config["risk_reward_ratio"])
+        tp_distance = sl_distance * rr
 
         if direction == "BUY":
             tp = entry_price + tp_distance
@@ -183,7 +187,7 @@ class RiskManager:
             tp = entry_price - tp_distance
 
         digits = self._get_symbol_digits(symbol) if symbol else 5
-        logger.debug(f"TP {direction}: {tp:.{digits}f} (RR={self.take_profit_config['risk_reward_ratio']})")
+        logger.debug(f"TP {direction} {symbol}: {tp:.{digits}f} (RR={rr})")
         return float(round(tp, digits))
 
     @staticmethod

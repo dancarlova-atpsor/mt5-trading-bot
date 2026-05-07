@@ -12,7 +12,16 @@ position_sizing:
 
   # Volum fix per simbol (override pe calculul automat)
   volume_overrides:
-    XAUUSD.cfd: 0.02        # Aur — volum redus pt cont mic (era 0.05 pe demo $98k)
+    XAUUSD.cfd: 0.02        # Aur — volum redus pt cont mic
+    XAGUSD.cfd: 0.01        # Argint — lot fix mic (volatilitate mare, limit DD)
+    # Stocks US — lot fix mic (1-5 actiuni / trade, dimensionat la pret)
+    NFLX.cfd:  0.01         # ~1 actiune NFLX ~$700 expunere
+    INTC.cfd:  0.05         # ~5 actiuni INTC ~$125 expunere
+    GOOGL.cfd: 0.02         # ~2 actiuni GOOGL ~$400 expunere
+    AMD.cfd:   0.03         # ~3 actiuni AMD ~$450 expunere
+    ORCL.cfd:  0.02         # ~2 actiuni ORCL ~$340 expunere
+    MSFT.cfd:  0.01         # ~1 actiune MSFT ~$500 expunere
+    AMZN.cfd:  0.02         # ~2 actiuni AMZN ~$440 expunere
 
 stop_loss:
   default_pips: 50
@@ -25,18 +34,26 @@ stop_loss:
   symbol_overrides: {}     # XAGUSD scos; XAUUSD foloseste ATR*1.5 default (bun)
 
 take_profit:
-  risk_reward_ratio: 3.0    # TP = SL * 3 (era 2.0, crescut pt mai mult profit/trade vs comision)
+  risk_reward_ratio: 3.0    # Default R:R = 3.0
   use_atr: true
   atr_multiplier: 3.0
+  # Per-symbol R:R override (din backtest 90d 2026-05-07):
+  # USDCAD si XAG functioneaza mai bine cu R:R 1.5 (TP atins mai des)
+  # AMD stock la fel
+  symbol_rr_overrides:
+    USDCAD.cfd: 1.5
+    XAGUSD.cfd: 1.5
+    AMD.cfd: 1.5
 
 trailing_stop:
-  enabled: true
-  activation_pips: 30       # Se activeaza dupa X pips profit
-  trail_pips: 15            # Distanta de trailing
+  enabled: false            # DEZACTIVAT 2026-04-28: prea agresiv pe XAU (30 pips = 30 cents)
+                            # ProfitManager tier-based trailing (profit-USD-based) e activ in main.py
+  activation_pips: 30
+  trail_pips: 15
 
 limits:
   max_open_positions: 3           # Max 3 pozitii simultan (cont mic)
   max_positions_per_symbol: 1     # Doar 1 pozitie per simbol (evita stacking)
-  max_daily_loss_percent: 1.0    # Opreste botul daca pierde 1% azi (~€53 pe 5300)
-  max_daily_trades: 3             # Max 3 trade-uri/zi (reduce overtrading)
+  max_daily_loss_percent: 2.0    # 2% (era 1%) — permite drawdown XAG/stocks fara stop bot
+  max_daily_trades: 5             # Crescut de la 3 — mai multe simboluri (forex+stocks)
   max_correlation_exposure: 2    # Max 2 pozitii pe perechi corelate

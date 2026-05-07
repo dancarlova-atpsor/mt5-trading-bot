@@ -10,12 +10,22 @@ account:
   magic_number: 123456      # ID unic pentru ordinele botului
 
 symbols:
-  # CONFIG REAL TEST 5300 EUR — 4 simboluri castigatoare confirmate live
-  # Scoase: AUDUSD (-$601), EURGBP (-$366), EURUSD (marginal -$6)
-  - XAUUSD.cfd       # +$150 net real (13 trades), comision minim $0.10/lot
-  - USDCHF.cfd       # marginal pozitiv, swap BUY OK
-  - USDCAD.cfd       # bun pe TF cu params 15/70/18
+  # CONFIG HIBRID + STOCKS (2026-05-07) — backtest 90d: $48-69/zi estimat
+  # Forex/Metals (4):
+  - XAUUSD.cfd       # SELL only (filter swap), R:R 3.0
+  - USDCHF.cfd       # R:R 3.0 (status quo functioneaza)
+  - USDCAD.cfd       # R:R 1.5 + filtru D1 (din backtest)
+  - XAGUSD.cfd       # REACTIVAT: lot fix 0.01, R:R 1.5 (best performer in test)
   - GBPUSD.cfd       # doar Breakout
+  # Stocks US (7) — doar cele profitabile in backtest 90d, sesiune 17:00-22:30 RO
+  - NFLX.cfd         # +$300 backtest, WR 57%
+  - INTC.cfd         # +$293 backtest, WR 50%
+  - GOOGL.cfd        # +$284 backtest, WR 39%
+  - AMD.cfd          # +$269 backtest, WR 63% (R:R 1.5)
+  - ORCL.cfd         # +$211 backtest, WR 50%
+  - MSFT.cfd         # +$165 backtest, WR 40%
+  - AMZN.cfd         # +$149 backtest, WR 33%
+  # Skip-uite (pierd in backtest): TSLA -$149, IBM -$68, UBER -$31
 
 active_strategies:
   - trend_following
@@ -53,6 +63,20 @@ profit_manager:
   cycle_pause_seconds: 300        # Pauza 5 min intre cicluri
   max_daily_profit_eur: 300       # Stop dupa +300 EUR castigati pe zi
   max_daily_loss_eur: 53          # Stop dupa -53 EUR pierduti pe zi (1% din 5324)
+
+stocks:
+  # Sesiune NASDAQ 16:30-23:00 RO; tranzactionam 17:00-22:30 (skip 30 min open + 25 min close)
+  symbols:
+    - NFLX.cfd
+    - INTC.cfd
+    - GOOGL.cfd
+    - AMD.cfd
+    - ORCL.cfd
+    - MSFT.cfd
+    - AMZN.cfd
+  trading_hours: "17:00-22:30"            # Cand pot deschide trade-uri NOI
+  close_before_market_close: "22:55"      # Force close TOATE pozitiile stocks (chiar pe minus)
+  earnings_blackout_days: 2               # Skip simbol +/- 2 zile fata de earnings
 
 news:
   calendar_enabled: true

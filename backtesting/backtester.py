@@ -163,13 +163,32 @@ class Backtester:
         return self.get_results()
 
     def _contract_size(self) -> float:
-        """Returneaza contract size pe baza simbolului."""
+        """Returneaza contract size pe baza simbolului.
+        Prefera valoarea de la broker daca e disponibil MT5, altfel fallback heuristic.
+        """
+        # Try MT5 first
+        try:
+            import MetaTrader5 as mt5
+            info = mt5.symbol_info(self.symbol)
+            if info and info.trade_contract_size > 0:
+                return float(info.trade_contract_size)
+        except Exception:
+            pass
+        # Fallback heuristic
         sym = self.symbol.upper()
         if "XAU" in sym:
             return 100
+        if "XAG" in sym:
+            return 5000
         if "US500" in sym or "US30" in sym or "NAS" in sym:
             return 1
-        return 100000
+        # US stocks (NVDA, TSLA, AAPL, etc.) — contract = 100 actiuni/lot
+        stock_tickers = ["NVDA", "TSLA", "AAPL", "MSFT", "META", "AMD", "AMZN", "GOOGL",
+                         "NFLX", "INTC", "PLTR", "ORCL", "BABA", "UBER", "IBM"]
+        for t in stock_tickers:
+            if t in sym:
+                return 100
+        return 100000  # Forex default
 
     def _calculate_pnl(self, position: dict, exit_price: float) -> float:
         """Calculeaza PnL pentru o pozitie."""

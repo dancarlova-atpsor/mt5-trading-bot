@@ -1,0 +1,55 @@
+# ============================================
+# Calendar Earnings Stocks 2026
+# ============================================
+# Bot evita trade-uri pe stocks cu earnings ±2 zile (configurabil in settings.yaml)
+# Update manual la fiecare trimestru. Sursa: Yahoo Finance / NASDAQ.
+# Format: YYYY-MM-DD
+#
+# Cum se aplica:
+# - 2 zile inainte: bot NU deschide trade-uri noi pe acel simbol
+# - 1 zi dupa earnings: bot inchide pozitia daca exista la 22:00 (cu 1h inainte de close)
+# - 2 zile dupa: bot NU deschide trade-uri noi
+# - Earnings se anunta DUPA close (afterhours), deci ziua earnings = ziua "T"
+
+NFLX.cfd:
+  - 2026-01-21    # Q4 2025
+  - 2026-04-22    # Q1 2026
+  - 2026-07-22    # Q2 2026 (estimat)
+  - 2026-10-21    # Q3 2026 (estimat)
+
+INTC.cfd:
+  - 2026-01-30    # Q4 2025
+  - 2026-04-24    # Q1 2026
+  - 2026-07-24    # Q2 2026 (estimat)
+  - 2026-10-23    # Q3 2026 (estimat)
+
+GOOGL.cfd:
+  - 2026-01-30    # Q4 2025
+  - 2026-04-24    # Q1 2026
+  - 2026-07-24    # Q2 2026 (estimat)
+  - 2026-10-30    # Q3 2026 (estimat)
+
+AMD.cfd:
+  - 2026-02-04    # Q4 2025
+  - 2026-05-06    # Q1 2026
+  - 2026-08-05    # Q2 2026 (estimat)
+  - 2026-11-04    # Q3 2026 (estimat)
+
+ORCL.cfd:
+  # ORCL fiscal year diferit: rapoarteaza Mar/Jun/Sep/Dec
+  - 2026-03-12    # Q3 FY2026
+  - 2026-06-11    # Q4 FY2026
+  - 2026-09-10    # Q1 FY2027
+  - 2026-12-10    # Q2 FY2027 (estimat)
+
+MSFT.cfd:
+  - 2026-01-29    # Q2 FY2026
+  - 2026-04-29    # Q3 FY2026
+  - 2026-07-29    # Q4 FY2026 (estimat)
+  - 2026-10-28    # Q1 FY2027 (estimat)
+
+AMZN.cfd:
+  - 2026-02-05    # Q4 2025
+  - 2026-04-30    # Q1 2026
+  - 2026-07-31    # Q2 2026 (estimat)
+  - 2026-10-29    # Q3 2026 (estimat)
