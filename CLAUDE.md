@@ -556,4 +556,333 @@ for p in positions:
 
 ---
 
+## 16. Reference commits & deploy snapshot
+
+| Data | Commit | Descriere |
+|---|---|---|
+| 2026-05-07 14:30 RO | `ab39a87` | HIBRID + STOCKS — strategia activa pe VPS |
+| 2026-05-07 15:30 RO | `27bf9c6` | CLAUDE.md initial |
+| 2026-05-07 16:00 RO | (acest commit) | CLAUDE.md complet (cap. 16-23) |
+| Anterior 2026-04-28 | `e9b2f5d` | Config REAL TEST 5300 EUR (simulated_balance) |
+| Anterior 2026-04-25 | `9504f58` | ProfitManager tier-based |
+| Anterior 2026-04-22 | `e18bab7` | TrendFollowing per-symbol params (grid search) |
+| Anterior 2026-04-19 | `f2151e0` | Entry filter selectiv (doar pe Breakout) |
+
+**Pentru rollback la status quo (pre-stocks):** `git checkout e9b2f5d -- config/`
+
+---
+
+## 17. OneDrive sync workflow
+
+**Laptop:** `C:\Users\danci\OneDrive\Desktop\MT 5\mt5-trading-bot\` (synced via OneDrive Personal cu cont Microsoft).
+
+**Workflow normal:**
+1. Modificari → fac pe laptop in `OneDrive/Desktop/MT 5/...`
+2. Test local (laptop are MT5 deschis)
+3. `git add -A && git commit && git push origin main`
+4. Pe VPS: download zip GitHub + overlay (vezi sectiunea 6.2)
+
+**OneDrive sync NU functioneaza pe VPS** (testat 2026-04-25 — sync e instabil pe Windows Server). Deci:
+- ❌ Modificari pe VPS = nu se propaga inapoi pe laptop
+- ✅ Modificari pe laptop = trec prin GitHub (manual deploy pe VPS)
+
+**Backup automat laptop:** OneDrive face cloud backup la `mt5-trading-bot/`. Fisiere importante (configs, logs vechi) nu se pierd daca laptop crash.
+
+**Backup VPS:** **NU EXISTA** automat. Daca crapa VPS-ul, fisierele de pe VPS se pierd. Singurul "backup" e GitHub repo. **Atentie: log-urile de pe VPS NU sunt in GitHub** (`logs/` e in `.gitignore`).
+
+---
+
+## 18. Trade history real (ultimele 2 saptamani)
+
+### 2026-04-28 → 2026-05-07 (status quo + initial XAG)
+
+| Data | Simbol | Tip | Vol | PnL | Note |
+|---|---|---|---:|---:|---|
+| 29.04 01:39 | USDCAD | BUY | 0.13 | +$11.96 | ✓ |
+| 01.05 00:03 | USDCHF | SELL | 0.10 | +$3.20 | ✓ |
+| 01.05 00:03 | USDCAD | SELL | 0.10 | +$10.10 | ✓ |
+| 04.05 13:57 | USDCHF | BUY | 0.13 | -$28.07 | ✗ counter-D1 |
+| 04.05 15:11 | USDCHF | BUY | 0.13 | +$11.28 | ✓ |
+| 04.05 17:51 | XAUUSD | SELL | 0.01 | -$33.66 | ✗ retrace lung |
+| 05.05 01:01 | USDCAD | BUY | 0.13 | -$13.18 | ✗ counter-D1 |
+| 06.05 12:01 | USDCHF | SELL | 0.13 | +$8.85 | ✓ |
+| 07.05 03:02 | USDCAD | BUY | 0.13 | -$14.12 | ✗ counter-D1 |
+
+**Statistica:** 9 trade-uri, WR 55.6%, NET **-$43.64**.
+**Pattern identificat:** 4/4 pierderi = trade-uri counter-D1 → motivul pentru filtru D1 selectiv pe USDCAD.
+
+### Pozitii deschise la deploy (2026-05-07 15:04)
+- USDCHF SELL 0.13 (vechi, ramas de la old config) — gestionata de bot nou via magic 123456
+- XAGUSD BUY 0.01 (NEW deschis de bot nou imediat la pornire) — R:R 1.5 confirmed working
+
+---
+
+## 19. Task Scheduler pe VPS — `close_swap_protection.py`
+
+**Status:** Necunoscut dupa deploy 2026-05-07. **DE VERIFICAT** la prima sesiune noua.
+
+**Ce face:** Script standalone care se conecteaza la MT5, inchide pozitii cu PnL > $5 inainte de:
+- Miercuri 22:55 RO (inainte de swap triplu Wed→Thu)
+- Vineri 22:55 RO (inainte de weekend)
+
+**Verificare pe VPS:**
+```powershell
+schtasks /query /TN "close_swap_protection*" /v /fo LIST 2>&1 | Select-String -Pattern "TaskName|Status|Next Run|Last Run"
+```
+
+**Daca task-urile NU exista, recreeaza:**
+```powershell
+$python = "C:\Users\Administrator\Desktop\bot\.venv\Scripts\python.exe"
+$script = "C:\Users\Administrator\Desktop\bot\close_swap_protection.py"
+$workdir = "C:\Users\Administrator\Desktop\bot"
+
+# Miercuri
+schtasks /create /tn "close_swap_protection_wed" /tr "$python `"$script`"" /sc weekly /d WED /st 22:55 /ru "Administrator" /rp "<PAROLA_ADMIN>" /f
+
+# Vineri
+schtasks /create /tn "close_swap_protection_fri" /tr "$python `"$script`"" /sc weekly /d FRI /st 22:55 /ru "Administrator" /rp "<PAROLA_ADMIN>" /f
+```
+
+**Note:** Bot-ul principal cu force-close 22:55 acopera doar **stocks**, NU forex/metals. Task-urile separate `close_swap_protection` acopera **forex/metals profitabile** Mier+Vin.
+
+---
+
+## 20. Profit Manager — tier-based trailing detaliu
+
+**Fisier:** `risk/profit_manager.py::_get_trail_pct_for_peak()`
+
+| Peak profit atins | Trail % | Lock % din peak | Exemplu |
+|---:|---:|---:|---|
+| < $20 | 0% (no trail) | — | Doar SL broker activ |
+| $20 - $50 | 50% | 50% | Peak $40 → close la $20 |
+| $50 - $100 | 35% | 65% | Peak $80 → close la $52 |
+| > $100 | 25% | 75% | Peak $150 → close la $112 |
+
+**Activare trailing:** la `+40 EUR` profit cumulativ pe pozitie (din settings.yaml).
+
+**Cycle target:** +150 EUR profit cumulativ pe **ciclu** (dintre toate pozitiile inchise consecutive). La +150 EUR → pauza 5 min, apoi reia.
+
+**Daily limits:**
+- `max_daily_profit_eur: 300` → bot opreste pana la urmatoarea zi
+- `max_daily_loss_eur: 53` → bot opreste pana la urmatoarea zi (~1% din 5324 EUR)
+- IN PARALEL: `max_daily_loss_percent: 1.0` din `risk_management.yaml` (calculat pe `simulated_balance: 5700` USD = $57)
+
+**Doua mecanisme separate** — primul atins opreste bot-ul.
+
+---
+
+## 21. SuperBot config detaliu
+
+**Fisier:** `superbot/superbot.py` + `config/settings.yaml::superbot`
+
+```yaml
+superbot:
+  enabled: true
+  deep_analysis_interval_iterations: 30    # 30 × 60s = 30 min
+  regime:
+    adx_period: 14
+    adx_trend_threshold: 25                # ADX > 25 → TRENDING
+    atr_period: 14
+    bb_period: 20
+    volatility_percentile_high: 80         # > P80 → VOLATILE
+    quiet_percentile_low: 20               # < P20 → QUIET (skip!)
+  performance:
+    window_hours: 24
+    min_trades_to_evaluate: 4              # Sub 4 trade/24h → nu evaluez
+    min_win_rate: 40                       # WR < 40% → DISABLE simbol 6h
+    disable_hours: 6
+    history_file: "logs/superbot/performance.json"
+  correlation:
+    timeframe: "M15"
+    lookback_bars: 120
+    max_abs_corr: 0.75                     # Daca avem deja BUY EURUSD si bot vrea BUY GBPUSD cu corr 0.85 → blocat
+  calibrator:
+    regime_size_mult:
+      TRENDING: 1.3                        # Trade-uri pe trend → lot ×1.3
+      RANGING: 0.7                         # Range → lot ×0.7
+      VOLATILE: 0.5                        # Volatil → lot ×0.5
+      QUIET: 0.0                           # Linistit → SKIP (size 0)
+      UNKNOWN: 0.0
+    skip_quiet: true
+    low_perf_penalty: 0.7                  # Performer slab → lot ×0.7 in plus
+    min_perf_win_rate: 45
+```
+
+**Flow gate_trade():**
+1. Filter swap (XAU BUY blocked)
+2. Filter D1 selectiv (doar USDCAD)
+3. Filter MTF + S/R (doar pe Breakout)
+4. Filter correlation (max 0.75 abs)
+5. Filter performance (auto-disable 6h)
+6. Calibrator size mult (regime + perf)
+7. → trade approved sau blocked
+
+---
+
+## 22. Componente proiect — descriere
+
+### `mql5/` folder
+EA pentru MT5 fallback (mod execution `mql5_ea` sau `both`).
+- `ExecutionEA.mq5` — primeste signal-uri din `MQL5/Files/` si executa
+- `SignalReceiver.mq5` — citeste fisier signal scris de Python
+- `files/` — director comunicare Python ↔ EA
+
+**Status actual:** NEACTIV. `execution.mode: "python_api"` foloseste direct `mt5.order_send()` din Python. EA-urile sunt fallback daca python API se rupe (ex: blocaj IPC).
+
+### `dashboard/app.py`
+Streamlit dashboard cu metrici live. **NEACTIV** (nu e pornit la deploy).
+
+**Pentru a porni manual:**
+```powershell
+cd C:\Users\Administrator\Desktop\bot
+.\.venv\Scripts\streamlit.exe run dashboard\app.py --server.port 8501
+```
+Acceseaza: http://localhost:8501 (pe VPS via RDP, sau prin tunnel SSH).
+
+### `analysis/multitf_analysis.py`
+Script ad-hoc pentru analiza multi-TF a oricarui simbol/perioada. Util pentru investigatii dupa pierderi.
+
+### `tests/` folder
+Pytest tests:
+- `test_backtester.py`
+- `test_risk_manager.py`
+- `test_strategies.py`
+- `test_superbot.py`
+
+**Cum rulezi:**
+```powershell
+cd C:\Users\danci\OneDrive\Desktop\MT 5\mt5-trading-bot
+.\.venv\Scripts\python.exe -m pytest tests/ -v
+```
+
+**Status acoperire:** ~30%. Multe componente noi (entry_filter, calibrator, stocks session) FARA teste. **TODO viitor.**
+
+### `core/` folder
+- `mt5_connector.py` — initialize MT5, connect/login, retry logic
+- `order_manager.py` — order_send wrapper, retry pe `requote`/`off-quotes`
+
+---
+
+## 23. Decision tree pentru o noua sesiune
+
+### 23.1 Daca user spune "review trading bot"
+1. Citeste `CLAUDE.md` (asta tu)
+2. Verifica logs ultimele 24h pe VPS:
+   ```powershell
+   Get-Content C:\Users\Administrator\Desktop\bot\logs\trading_bot.log -Tail 200
+   ```
+3. Verifica trade-uri Telegram (ultimele 7 zile)
+4. Calculeaza WR si NET P&L
+5. Compara cu estimare $48-69/zi (target)
+6. Identifica pattern-uri de pierdere
+7. Propune (DAR NU IMPLEMENTA) ajustari
+
+### 23.2 Daca user spune "bot-ul a pierdut bani"
+1. **Pattern check:** trade-urile pierdute sunt counter-D1? Pe acelasi simbol?
+2. **Regime check:** simbolul a trecut din TRENDING in RANGING?
+3. **Performance tracker:** simbolul a fost auto-disabled?
+4. **Earnings:** s-a tranzactionat pe simbol cu earnings recent? (verifica `earnings_calendar.yaml`)
+5. **News:** blackout active? (Forex Factory)
+
+### 23.3 Daca user vrea sa adauge un simbol nou
+1. **Backtest 90 zile OBLIGATORIU** inainte de deploy (`backtesting/compare_options.py`)
+2. Daca simbol stock → adauga si in `earnings_calendar.yaml`
+3. Verifica `mt5.symbol_info()` — disponibil pe broker?
+4. Daca metale/forex → verifica swap (XAU style trap)
+5. Cherry-pick R:R per backtest (3.0 sau 1.5)
+6. NU implementa direct — propune si astepta confirmare user
+
+### 23.4 Daca user spune "vreau strategie noua"
+1. Backtest **3 variante minimum** (status quo, optiune A, optiune B)
+2. **MENTIONEAZA disclaimer:** backtest = upper bound, real ~50-70%
+3. Verifica `max_open_positions: 3` — strategia incape?
+4. Verifica `max_lot: 0.10` — leverage OK?
+5. **NU implementa pana nu raspunde user** la trade-off-uri
+6. Daca user aproba → cod + commit + deploy + restart
+
+### 23.5 Daca bot-ul nu mai ruleaza
+1. SSH/RDP pe VPS
+2. `Get-Process python` — vezi cati ruleaza
+3. Daca 0 → bot-ul a fost oprit (fereastra inchisa? VPS reboot?)
+4. `Get-Content logs\trading_bot.log -Tail 100` — vezi ce a fost ultimul mesaj
+5. Cauta `ERROR`, `CRITICAL`, `Traceback`
+6. Daca CONTROLLED stop → reporneste cu `.\.venv\Scripts\python.exe main.py`
+7. Daca CRASH → escaleaza la user, debug logs
+
+### 23.6 Daca user vrea trecere pe cont real
+**STOP. Conditii minime:**
+- Cel putin **30 zile profit constant** pe demo
+- DD < 15% confirmed
+- Win rate > 40%
+- Earnings calendar updated
+- Backup VPS (snapshot)
+
+**Dupa confirmare user:**
+1. Modifica `config/settings.yaml::account.mode: real`
+2. Modifica `account.number` la cont real
+3. Set env var `MT5_PASSWORD` real
+4. **NU pleaca de acolo** — ramai online primele 24-48h sa verifici
+
+---
+
+## 24. Lessons learned (extra)
+
+### 24.1 Backtest pitfalls (2026-05-07)
+- **`init_mt5()` lipsea in `hybrid_backtest.py`** → toate simbolurile SKIP. Mereu inclus init la inceput de `main()`.
+- **`contract_size = 100000` default forex** → catastrofa pe stocks. **Mereu detect via `mt5.symbol_info().trade_contract_size`**.
+- **DCA naiv = simulare nerealista.** Mereu adauga: cooldown, comm, swap, max_pozitii, max_lot.
+- **Win rate 99% poate fi capcana** — daca `HARD_SL` sterge ~20% din profit total, WR e iluzoriu.
+
+### 24.2 Volatility-aware decisions
+- XAU 4500 → 4700 in 2 zile (mai 2026) = ATR H1 a sarit de la 30 la 50 → SL stransa = stop hit constant
+- **R:R 3.0 functioneaza pe trenduri stabile** (USDCHF, USDCAD luni de zile direction lent)
+- **R:R 1.5 functioneaza pe volatilitate mare** (XAU, XAG, stocks intra-day)
+- **NU schimba R:R global** — schimba per-symbol
+
+### 24.3 Stocks specifics
+- Spread = 0 advertise, dar fill **slippage 0.1-0.5%** in primele 30 min open (de aceea skip)
+- Earnings = miscare ±10-20% in afterhours → **gap peste SL**, broker te inchide la pretul gap
+- Volume real = 0.05-0.15 lot pe trade (5-15 actiuni) — expunere $500-2000/trade
+- Liquidity overnight = ZERO → bot **NU TINE pozitii peste 23:00 RO** (force close 22:55)
+
+### 24.4 User behavior patterns
+- User raspunde MAJUSCULE = e in graba sau frustrat. **Raspunde scurt, fara introduceri lungi**.
+- User cere "doar analiza" → NU implementa, doar prezinta. Asteapta confirmare explicita.
+- User accepta backtest disclaimer-ul → da-i adevarul brut, nu numere optimiste.
+- User vrea **decizii rapide cu numere clare**, nu raspunsuri vagi cu "ar trebui sa testam mai mult".
+
+### 24.5 VPS gotchas
+- **EarnBroker custom MT5 (build 5833)** OBLIGATORIU — generic MetaQuotes (5836) nu e compatibil cu Python lib 5.0.5735
+- **PowerShell window inchis = bot oprit.** Nice-to-have: Windows Service.
+- **OneDrive nu sync pe VPS** — folosim git deploy
+- **Repo privat** — public temporar pentru deploy, private inapoi
+- **Task Scheduler can break** dupa update Windows. Verifica periodic.
+
+### 24.6 Crypto symbols available (NEUTILIZATE)
+Pe broker EarnBroker exista (din `pips_to_price`):
+- `BTCUSD.cfd` — pip = 1.0
+- `ETHUSD.cfd` — pip = 0.1
+- `SOLUSD.cfd` — pip = 0.01
+
+**STATUS:** netranzactionate. Backtest-uite niciodata. Daca user vrea — necesita strategie diferita (24/7 trading, swap diferit, volatilitate mare).
+
+---
+
+## 25. Quick reference card (cheat sheet)
+
+```
+ACUM PE VPS:           Bot ruleaza, 12 simboluri, HIBRID + STOCKS
+TARGET ZILNIC:         $48-69/zi (€55-85/zi)
+DD MAX ACCEPTABIL:     15% (~$855)
+COMMIT DEPLOY:         ab39a87 (cod) + 27bf9c6 (CLAUDE.md)
+NEXT REVIEW:           ~7 zile (14 mai 2026)
+EARNINGS NEXT:         AMD 06.05 (blackout 04-08.05), MSFT 28.10
+FORCE CLOSE STOCKS:    22:55 RO automat (chiar pe minus)
+SWAP PROTECTION:       Mier+Vin 22:55 (verifica Task Scheduler!)
+USER PREFERENCES:      Romanian, decizii rapide, fara fluff
+NU IMPLEMENTA fara:    Backtest 90+ zile + confirmare explicita user
+```
+
+---
+
 **FIN CLAUDE.md.** Daca lipseste ceva important, adauga-l aici si commit imediat.
