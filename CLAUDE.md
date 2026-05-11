@@ -200,7 +200,39 @@ mt5-trading-bot/
 - Startup cleanup: la pornire bot, daca stocks deschise + in afara sesiunii → force close imediat
 - Logging detaliat cu zi (Lun/Marti/...) si ora RO
 
-**Status:** ✅ Fix in commit (vezi reference commits sectiunea 16). Deploy VPS necesar.
+**Status:** ✅ Fix DEPLOYED pe VPS (commit `a8ff509`, deploy 2026-05-11 17:07 RO). VPS timezone setat la GTB Standard Time (UTC+2 RO) pentru consistenta log-urilor. Test real vineri 16.05 22:55.
+
+### Bug #8: Cooldown 300s ignorat pe stocks dupa broker SL/TP (FIX 2026-05-11, NEDEPLOYAT)
+**Locatie:** `main.py::poll_broker_closes()` linia 158
+**Problema observata 2026-05-08:**
+- INTC #1 inchis 19:02:44 broker TP (+$77.07)
+- INTC #2 deschis 19:04:21 — **1m37s** dupa close, sub cooldown 300s
+- INTC #2 inchis 19:19:20 broker SL (-$32.27)
+- INTC #3 deschis 19:20:23 — **1m03s** dupa close, sub cooldown 300s
+
+**Root cause:** `poll_broker_closes()` salva `out_deal.time` (broker server time, posibil alt timezone) in `symbol_last_close_time`. Cooldown check folosea `time.time()` (UTC epoch local Python). Diferenta de timezone facea `time.time() - last_close` sa fie mult > 300s (sau negativ care comparison-ul tot esua).
+
+**Fix:**
+- `symbol_last_close_time[symbol] = time.time()` in loc de `closed_at` (broker time)
+- Log cooldown la nivel INFO (era DEBUG) pentru vizibilitate viitoare
+
+**Status:** ⚠️ Fix COMMITTED (commit `d631bcb`) dar **NU DEPLOYAT pe VPS**. Userul a decis sa lase saptamana 12-18 mai 2026 fara modificari. Deploy planificat lunea 19 mai dupa review.
+
+**Workaround pana la deploy:** Cooldown poate fi ignorat ocazional pe stocks dupa SL/TP. Pierderi potentiale estimate < $50/saptamana din re-entry-uri rapide ratate.
+
+### Bug #9: Re-entry dupa TP pe acelasi simbol = capcana trend epuizat (NEFIXAT)
+**Pattern observat:** INTC TP +$77 → re-entry imediat → SL -$32. Bot vede semnal H1 inca valid dupa TP-ul anterior, dar trend-ul s-a epuizat. Cooldown 300s ajuta partial dar nu blocheaza complet.
+**Posibila solutie:** Cooldown extins (30 min) doar dupa TP hit pe stocks. Sau filter: skip semnal daca acelasi simbol a inchis cu TP in ultimele 60 min.
+**Status:** ⚠️ Nedecis. Necesita date 1-2 saptamani sa confirm pattern.
+
+### Bug #10: USDCHF 3 directii in 2 zile = ranging false signals (NEFIXAT)
+**Pattern observat 07-08.05:** USDCHF SELL -$22 → BUY -$27 → SELL -$28. Toate au pierdut. Bot ia ambele directii desi simbolul e in RANGING.
+**Posibile solutii:**
+- A) Filter: daca un simbol a pierdut 2+ trade-uri in ultimele 24h → auto-disable 12h (mai sever decat min_win_rate=40 actual)
+- B) Scot USDCHF temporar pana H1 trend devine clar
+- C) Reduce R:R USDCHF la 1.5 (similar XAG/USDCAD)
+- D) Las performance_tracker sa lucreze (auto-disable 6h dupa 4 trade-uri WR<40%)
+**Status:** ⚠️ Nedecis. User a optat pentru D — observatie pasiva o saptamana, decizie pe 19 mai.
 
 ---
 
@@ -579,17 +611,20 @@ for p in positions:
 
 ## 16. Reference commits & deploy snapshot
 
-| Data | Commit | Descriere |
-|---|---|---|
-| 2026-05-07 14:30 RO | `ab39a87` | HIBRID + STOCKS — strategia activa pe VPS |
-| 2026-05-07 15:30 RO | `27bf9c6` | CLAUDE.md initial |
-| 2026-05-07 16:00 RO | (acest commit) | CLAUDE.md complet (cap. 16-23) |
-| Anterior 2026-04-28 | `e9b2f5d` | Config REAL TEST 5300 EUR (simulated_balance) |
-| Anterior 2026-04-25 | `9504f58` | ProfitManager tier-based |
-| Anterior 2026-04-22 | `e18bab7` | TrendFollowing per-symbol params (grid search) |
-| Anterior 2026-04-19 | `f2151e0` | Entry filter selectiv (doar pe Breakout) |
+| Data | Commit | Descriere | Status VPS |
+|---|---|---|---|
+| 2026-05-11 17:00 RO | `d631bcb` | Fix Bug #8 cooldown (broker time vs UTC) | ⚠️ NEDEPLOYAT |
+| 2026-05-11 16:00 RO | `a8ff509` | Fix Bug #7 force-close stocks 22:55 ZoneInfo | ✅ DEPLOYAT |
+| 2026-05-07 15:30 RO | `478580a` | CLAUDE.md complet 100% | ✅ pe GitHub |
+| 2026-05-07 14:30 RO | `ab39a87` | HIBRID + STOCKS — strategia activa pe VPS | ✅ DEPLOYAT |
+| Anterior 2026-04-28 | `e9b2f5d` | Config REAL TEST 5300 EUR (simulated_balance) | — |
+| Anterior 2026-04-25 | `9504f58` | ProfitManager tier-based | — |
+| Anterior 2026-04-22 | `e18bab7` | TrendFollowing per-symbol params (grid search) | — |
+| Anterior 2026-04-19 | `f2151e0` | Entry filter selectiv (doar pe Breakout) | — |
 
 **Pentru rollback la status quo (pre-stocks):** `git checkout e9b2f5d -- config/`
+
+**Versiune ruleaza pe VPS in saptamana 12-18 mai 2026:** `a8ff509` (cu fix force-close, fara fix cooldown). Deploy `d631bcb` planificat lunea 19 mai dupa review.
 
 ---
 
@@ -635,6 +670,31 @@ for p in positions:
 ### Pozitii deschise la deploy (2026-05-07 15:04)
 - USDCHF SELL 0.13 (vechi, ramas de la old config) — gestionata de bot nou via magic 123456
 - XAGUSD BUY 0.01 (NEW deschis de bot nou imediat la pornire) — R:R 1.5 confirmed working
+
+### 2026-05-07 → 2026-05-11 (post-deploy HIBRID + STOCKS, primele 4 zile)
+
+| Data | Simbol | Tip | Vol | PnL | Outcome |
+|---|---|---|---:|---:|---|
+| 07.05 15:04 | XAGUSD | buy | 0.01 | -$9.90 | SL hit |
+| 07.05 17:00 | ORCL | buy | 0.03 | -$13.23 | SL hit |
+| 07.05 18:02 | XAGUSD | buy | 0.01 | -$10.70 | SL hit |
+| 07.05 10:29 | USDCHF | sell | 0.13 | -$22.70 | SL hit |
+| 07.05 22:00 | USDCHF | buy | 0.13 | -$27.05 | trailing close |
+| 08.05 17:38 | INTC | buy | 0.07 | **+$77.07** | TP hit ✓ |
+| 08.05 19:04 | INTC | buy | 0.07 | -$32.27 | SL hit (re-entry rapid!) |
+| 08.05 19:20 | INTC | buy | 0.03 | +$8.55 | trailing close LUNI (Bug #7!) |
+| 08.05 20:06 | USDCHF | sell | 0.13 | -$28.23 | broker close luni 00:00 |
+| 11.05 17:07 | INTC | buy | 0.05 | OPEN | R:R 3.0 confirmed |
+
+**Statistica 9 trade-uri inchise:** WR 22% (2W/7L), NET **-$58.46** in 4 zile = **-$14.6/zi** (vs target +$48-69/zi).
+
+**Pattern-uri identificate:**
+1. Singurul win mare (+$77 INTC TP) — trend stabilit dimineata pe stock
+2. 4/9 pierderi = re-entry rapid pe acelasi simbol (Bug #8 cooldown)
+3. 3/9 pierderi = USDCHF 3 directii in 2 zile (Bug #10 ranging false signals)
+4. 1/9 = INTC ramasa weekend (Bug #7, deja fixat)
+
+**Decizie 2026-05-11:** Observare pasiva pana 19 mai. Performance_tracker va auto-disable simboluri WR<40% dupa 4 trade-uri.
 
 ---
 
@@ -892,16 +952,23 @@ Pe broker EarnBroker exista (din `pips_to_price`):
 ## 25. Quick reference card (cheat sheet)
 
 ```
-ACUM PE VPS:           Bot ruleaza, 12 simboluri, HIBRID + STOCKS
+ACUM PE VPS:           Bot ruleaza commit a8ff509 (fix force-close)
+                       NOT ruleaza: d631bcb (fix cooldown — committed, nedeployat)
 TARGET ZILNIC:         $48-69/zi (€55-85/zi)
+PERFORMANTA REALA:     -$58 / 4 zile (07-11 mai) = -$14.6/zi (departe de target)
 DD MAX ACCEPTABIL:     15% (~$855)
-COMMIT DEPLOY:         ab39a87 (cod) + 27bf9c6 (CLAUDE.md)
-NEXT REVIEW:           ~7 zile (14 mai 2026)
-EARNINGS NEXT:         AMD 06.05 (blackout 04-08.05), MSFT 28.10
-FORCE CLOSE STOCKS:    22:55 RO automat (chiar pe minus)
-SWAP PROTECTION:       Mier+Vin 22:55 (verifica Task Scheduler!)
-USER PREFERENCES:      Romanian, decizii rapide, fara fluff
+TIMEZONE VPS:          GTB Standard Time (UTC+2 RO) — schimbat 2026-05-11
+COMMIT ACTIV VPS:      a8ff509 (HIBRID + force-close stocks)
+COMMIT PENDING:        d631bcb (fix cooldown) — DEPLOY luni 19 mai
+NEXT REVIEW:           19 mai 2026 (luni)
+EARNINGS NEXT:         AMD 06.05 (trecut), MSFT 28.10, NFLX 17.04
+FORCE CLOSE STOCKS:    22:55 RO automat (chiar pe minus) — testat vineri 16.05
+SWAP PROTECTION:       Mier+Vin 22:55 (VERIFICA Task Scheduler dupa deploy!)
+USER PREFERENCES:      Romanian, decizii rapide, fara fluff, MAJUSCULE = in graba
 NU IMPLEMENTA fara:    Backtest 90+ zile + confirmare explicita user
+BUG-URI ACTIVE:        #8 cooldown (fix committed nedeployat)
+                       #9 re-entry dupa TP (nedecis)
+                       #10 USDCHF ranging false signals (lasam tracker)
 ```
 
 ---
