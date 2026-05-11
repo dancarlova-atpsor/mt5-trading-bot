@@ -277,6 +277,68 @@ def main():
     stock_trading_hours = stocks_config.get("trading_hours", "16:30-22:55")
     stock_close_at = stocks_config.get("close_before_market_close", "")
     stocks_closed_today = False
+    last_close_check_date = None  # date la care s-a evaluat ultima oara stocks close
+
+    # TZ-aware: foloseste Europe/Bucharest pentru orice comparatie de timp pe stocks
+    # (VPS poate fi pe UTC, altfel force-close se ageaza la ora gresita)
+    try:
+        from zoneinfo import ZoneInfo
+        BUCHAREST_TZ = ZoneInfo("Europe/Bucharest")
+    except Exception:
+        try:
+            import pytz
+            BUCHAREST_TZ = pytz.timezone("Europe/Bucharest")
+        except Exception:
+            logger.warning("Nu pot importa zoneinfo/pytz - folosesc datetime.now() naive")
+            BUCHAREST_TZ = None
+
+    def _now_ro():
+        """Returneaza datetime curent in timezone Europe/Bucharest, indiferent de TZ-ul serverului."""
+        from datetime import datetime
+        if BUCHAREST_TZ is not None:
+            return datetime.now(BUCHAREST_TZ)
+        return datetime.now()
+
+    def _stocks_should_be_closed(current_dt):
+        """Returneaza True daca pozitiile stocks ar trebui sa fie inchise la momentul curent.
+        Inchidem stocks:
+        - Dupa ora close_at (22:55 RO) in orice zi
+        - In weekend (sambata, duminica)
+        - Inainte de close_at = ramane in sesiune
+        """
+        if not stock_close_at:
+            return False
+        try:
+            hh, mm = stock_close_at.split(":")
+            close_t = current_dt.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+            # Weekend = sambata (5) si duminica (6)
+            if current_dt.weekday() in (5, 6):
+                return True
+            # Dupa ora close_at in ziua curenta
+            if current_dt >= close_t:
+                return True
+            return False
+        except Exception:
+            return False
+
+    # STARTUP CLEANUP: daca exista stocks deschise si suntem in afara sesiunii → force close imediat
+    try:
+        startup_now = _now_ro()
+        if _stocks_should_be_closed(startup_now) and stock_symbols:
+            open_pos = order_manager.get_open_positions()
+            stocks_to_close = [p for p in open_pos if p["symbol"] in stock_symbols]
+            if stocks_to_close:
+                logger.warning(f"[STARTUP CLEANUP] {len(stocks_to_close)} pozitii stocks deschise in afara sesiunii — inchid acum")
+                for pos in stocks_to_close:
+                    result = order_manager.close_position(pos["ticket"], comment="startup_cleanup")
+                    if result.success:
+                        logger.info(f"  Cleanup #{pos['ticket']} {pos['symbol']} {pos['volume']}lot PnL {pos['profit']:+.2f}")
+                        try:
+                            notifier.notify_trade_closed(pos["symbol"], "startup_cleanup", pos["profit"])
+                        except Exception:
+                            pass
+    except Exception as e:
+        logger.error(f"Startup cleanup error: {e}")
 
     outside_hours_logged = False
     daily_report_sent = False
@@ -293,24 +355,36 @@ def main():
     try:
         while running:
             try:
-                # Stocks close-before-market-close — inchide DOAR stocks la 22:55 (evita swap -$15/zi)
+                # Stocks close-before-market-close — TZ-aware + continous fallback
+                # (Bug 2026-05-11: INTC ramasa deschis peste weekend din cauza window 5min + TZ naive)
                 if stock_close_at and stock_symbols:
                     try:
-                        from datetime import datetime, time as dtime
-                        hh, mm = stock_close_at.split(":")
-                        close_t = dtime(int(hh), int(mm))
-                        now_t = datetime.now().time()
-                        close_window_end = dtime(int(hh), min(int(mm)+5, 59))
-                        if close_t <= now_t <= close_window_end and not stocks_closed_today:
+                        now_ro = _now_ro()
+                        today = now_ro.date()
+                        # Reset flag daca s-a schimbat ziua (zi noua → restart cycle)
+                        if last_close_check_date != today:
+                            stocks_closed_today = False
+                            last_close_check_date = today
+
+                        # Daca stocks ar trebui sa fie inchise SI sunt inca deschise → inchide
+                        if _stocks_should_be_closed(now_ro):
                             open_list = order_manager.get_open_positions()
                             stocks_open = [p for p in open_list if p["symbol"] in stock_symbols]
                             if stocks_open:
-                                logger.info(f"[STOCKS CLOSE {stock_close_at}] Inchid {len(stocks_open)} pozitii stocks (evit swap -$15/zi)")
+                                wk = ["Lun", "Marti", "Mier", "Joi", "Vin", "Sam", "Dum"][now_ro.weekday()]
+                                logger.warning(
+                                    f"[STOCKS CLOSE {now_ro.strftime('%H:%M')} RO {wk}] "
+                                    f"Inchid {len(stocks_open)} pozitii stocks (force-close in afara sesiunii)"
+                                )
                                 close_ts = time.time()
                                 for pos in stocks_open:
                                     result = order_manager.close_position(pos["ticket"], comment="stock_mkt_close")
                                     if result.success:
                                         logger.info(f"  Inchis #{pos['ticket']} {pos['symbol']} {pos['volume']}lot PnL {pos['profit']:+.2f}")
+                                        try:
+                                            notifier.notify_trade_closed(pos["symbol"], "stock_mkt_close", pos["profit"])
+                                        except Exception:
+                                            pass
                                         if superbot is not None:
                                             try:
                                                 superbot.on_trade_closed(symbol=pos["symbol"], strategy=pos.get("comment") or "unknown",
@@ -318,10 +392,7 @@ def main():
                                             except Exception:
                                                 pass
                                         symbol_last_close_time[pos["symbol"]] = close_ts
-                            stocks_closed_today = True
-                        # Reset flag la schimbare zi (dupa miezul noptii)
-                        if now_t < close_t and stocks_closed_today:
-                            stocks_closed_today = False
+                                stocks_closed_today = True
                     except Exception as e:
                         logger.error(f"stocks close_at error: {e}")
 

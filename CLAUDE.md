@@ -181,6 +181,27 @@ mt5-trading-bot/
 **Cauza:** OneDrive sync lock-uieste fisierul `trading_bot.log` la rotare.
 **Status:** Logging continua sa scrie cu eroare cosmetica. Nu blocheaza bot-ul.
 
+### Bug #7: Force-close stocks 22:55 NU se executa — INTC ramasa peste weekend (FIX 2026-05-11)
+**Locatie:** `main.py` cap. force-close stocks
+**Problema observata:**
+- INTC ticket #43468889 deschis vineri 08.05 19:20:23, inchis luni 11.05 15:38:14
+- 2.5 zile expunere peste weekend pe stock (in afara sesiunii NASDAQ)
+- Force-close 22:55 RO NU s-a executat
+**Root cause:** 4 bug-uri cumulate:
+1. **Window prea ingust** — doar 5 min (22:55-22:59). Daca bot e busy/lag, ratam window-ul
+2. **Timezone naive** — `datetime.now()` foloseste ora server. Daca VPS pe UTC sau alta TZ → fire la ora gresita
+3. **Niciun fallback** — daca window 5min ratat o data, stocks ramane open pana zi noua
+4. **Niciun startup cleanup** — daca bot restart in weekend, nu detecteaza stocks deschise
+
+**Fix:**
+- TZ-aware explicit `ZoneInfo("Europe/Bucharest")` cu fallback la pytz
+- Functie `_stocks_should_be_closed(dt)` — verifica weekend SI ora > close_at
+- Loop continuu (nu doar in window 5min): la fiecare iteration, daca stocks_should_be_closed → inchide
+- Startup cleanup: la pornire bot, daca stocks deschise + in afara sesiunii → force close imediat
+- Logging detaliat cu zi (Lun/Marti/...) si ora RO
+
+**Status:** ✅ Fix in commit (vezi reference commits sectiunea 16). Deploy VPS necesar.
+
 ---
 
 ## 6. VPS deployment
