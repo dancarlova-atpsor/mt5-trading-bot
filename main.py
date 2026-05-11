@@ -155,7 +155,9 @@ def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts:
                     f"[{strategy}] PnL={pnl:+.2f}"
                 )
                 if symbol_last_close_time is not None:
-                    symbol_last_close_time[symbol] = closed_at
+                    # Bug fix 2026-05-11: foloseste time.time() local NU broker time
+                    # (broker time poate fi in alt timezone — cooldown failed pe INTC)
+                    symbol_last_close_time[symbol] = time.time()
             except Exception as e:
                 logger.error(f"on_trade_closed feed error: {e}")
 
@@ -522,7 +524,8 @@ def main():
                         last_close = symbol_last_close_time.get(symbol, 0)
                         if time.time() - last_close < position_cooldown:
                             remaining = int(position_cooldown - (time.time() - last_close))
-                            logger.debug(f"[COOLDOWN] {symbol}: astept inca {remaining}s")
+                            # INFO (era DEBUG) pentru vizibilitate — bug INTC 2026-05-08 cooldown ignorat
+                            logger.info(f"[COOLDOWN] {symbol}: astept inca {remaining}s (last close: {last_close:.0f})")
                             continue
 
                         # News blackout check
