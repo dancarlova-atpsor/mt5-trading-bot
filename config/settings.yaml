@@ -10,22 +10,18 @@ account:
   magic_number: 123456      # ID unic pentru ordinele botului
 
 symbols:
-  # CONFIG HIBRID + STOCKS (2026-05-07) — backtest 90d: $48-69/zi estimat
-  # Forex/Metals (4):
-  - XAUUSD.cfd       # SELL only (filter swap), R:R 3.0
-  - USDCHF.cfd       # R:R 3.0 (status quo functioneaza)
-  - USDCAD.cfd       # R:R 1.5 + filtru D1 (din backtest)
-  - XAGUSD.cfd       # REACTIVAT: lot fix 0.01, R:R 1.5 (best performer in test)
-  - GBPUSD.cfd       # doar Breakout
-  # Stocks US (7) — doar cele profitabile in backtest 90d, sesiune 17:00-22:30 RO
-  - NFLX.cfd         # +$300 backtest, WR 57%
-  - INTC.cfd         # +$293 backtest, WR 50%
-  - GOOGL.cfd        # +$284 backtest, WR 39%
-  - AMD.cfd          # +$269 backtest, WR 63% (R:R 1.5)
-  - ORCL.cfd         # +$211 backtest, WR 50%
-  - MSFT.cfd         # +$165 backtest, WR 40%
-  - AMZN.cfd         # +$149 backtest, WR 33%
-  # Skip-uite (pierd in backtest): TSLA -$149, IBM -$68, UBER -$31
+  # CONFIG METAL-ONLY (2026-05-18) — review saptamana 11-15 mai:
+  # Performance REALA: metale +$80 (80% WR), stocks -$53 (14% WR), USDCHF -$36 (0% WR)
+  # Backtest 90d a fost optimist pe stocks — realitatea inversata.
+  # User decizie A+B+C: scot stocks + USDCHF + USDCAD + GBPUSD. Pastrez doar XAU + XAG.
+  - XAUUSD.cfd       # SELL only (filter swap), R:R 3.0 — 2W in 15.05 +$17.55
+  - XAGUSD.cfd       # lot fix 0.01, R:R 1.5 — 3W in 14-15.05 +$62.90
+  # SCOASE 2026-05-18 (review post-deploy):
+  # - USDCHF.cfd     # 0/2 WR saptamana asta, -$36.71 (Bug #10 ranging false signals)
+  # - USDCAD.cfd     # 0 trade-uri reusite saptamana asta
+  # - GBPUSD.cfd     # 0 trade-uri reusite saptamana asta (doar breakout configurat)
+  # - NFLX, INTC, AMD, AMZN, MSFT, GOOGL, ORCL — total -$53.50 (14% WR)
+  # - Bug #11 (stocks deschise duminica retry spam) eliminat odata cu stocks
 
 active_strategies:
   - trend_following
@@ -65,18 +61,13 @@ profit_manager:
   max_daily_loss_eur: 53          # Stop dupa -53 EUR pierduti pe zi (1% din 5324)
 
 stocks:
-  # Sesiune NASDAQ 16:30-23:00 RO; tranzactionam 17:00-22:30 (skip 30 min open + 25 min close)
-  symbols:
-    - NFLX.cfd
-    - INTC.cfd
-    - GOOGL.cfd
-    - AMD.cfd
-    - ORCL.cfd
-    - MSFT.cfd
-    - AMZN.cfd
-  trading_hours: "17:00-22:30"            # Cand pot deschide trade-uri NOI
-  close_before_market_close: "22:55"      # Force close TOATE pozitiile stocks (chiar pe minus)
-  earnings_blackout_days: 2               # Skip simbol +/- 2 zile fata de earnings
+  # DEZACTIVAT 2026-05-18 — stocks au pierdut $53 in saptamana 11-15 mai (14% WR)
+  # Lista goala = bot nu va deschide trade-uri pe stocks + nu va incerca force-close
+  # Bug #11 (retry spam Sunday) automat rezolvat (nu mai sunt stocks).
+  symbols: []
+  trading_hours: "17:00-22:30"
+  close_before_market_close: "22:55"
+  earnings_blackout_days: 2
 
 news:
   calendar_enabled: true

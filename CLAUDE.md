@@ -3,7 +3,7 @@
 > **Fisier critic.** Citeste-l in INTREGIME inainte sa propui modificari.
 > Userul (Dan, SC Luxuria Trans & Travel SRL) opereaza un bot de trading MT5 pe cont demo EarnBroker. Foloseste Romanian / Romglish in conversatii.
 
-Ultima actualizare: **2026-05-07** (deploy strategie HIBRID + STOCKS pe VPS).
+Ultima actualizare: **2026-05-18** (decizia A+B+C: simplificare la METAL-ONLY dupa review saptamana 11-15 mai).
 
 ---
 
@@ -11,11 +11,16 @@ Ultima actualizare: **2026-05-07** (deploy strategie HIBRID + STOCKS pe VPS).
 
 **Bot ruleaza pe VPS** (MyForexVPS Silver Windows 2019, $14.99/luna), conectat la **MetaTrader 5 EarnBroker custom build 5833**.
 
-**Strategie activa:** HIBRID FOREX/METALS + STOCKS US (deployed 2026-05-07 ~15:04 RO).
+**Strategie activa:** **METAL-ONLY** (XAU + XAG) — simplificare 2026-05-18 dupa review weekly real.
 
-**Cont MT5 demo:** `9047479` @ EarnBroker-Sharp ECN, balance ~$98,624 USD (cont mare demo), magic number `123456`, leverage 1:100, simulated_balance pentru risc = `5700 USD` (echivalent 5300 EUR target real).
+**Cont MT5 demo:** `9047479` @ EarnBroker-Sharp ECN, balance ~$98,092 USD (cont mare demo), magic number `123456`, leverage 1:100, simulated_balance pentru risc = `5700 USD` (echivalent 5300 EUR target real).
 
-**Target zilnic estimat:** $48-69/zi (€55-85/zi). Backtest 90 zile: forex/metals +$3000-4500, stocks +$1721.
+**Target zilnic estimat:** $50-80/zi pe metale (pe baza performanta reala 14-15 mai: +$80 in 24h).
+
+**ISTORIC strategii:**
+- 2026-04-14 → 2026-05-07: 4 forex/metals (XAU, USDCHF, USDCAD, GBPUSD) — break-even
+- 2026-05-07 → 2026-05-18: HIBRID + 7 STOCKS — backtest a fost optimist; real -$58 (week 1) + -$10 (week 2)
+- 2026-05-18 → prezent: **METAL-ONLY** (XAU + XAG) — singurele care performeaza pe demo real
 
 ---
 
@@ -952,23 +957,22 @@ Pe broker EarnBroker exista (din `pips_to_price`):
 ## 25. Quick reference card (cheat sheet)
 
 ```
-ACUM PE VPS:           Bot ruleaza commit a8ff509 (fix force-close)
-                       NOT ruleaza: d631bcb (fix cooldown — committed, nedeployat)
-TARGET ZILNIC:         $48-69/zi (€55-85/zi)
-PERFORMANTA REALA:     -$58 / 4 zile (07-11 mai) = -$14.6/zi (departe de target)
-DD MAX ACCEPTABIL:     15% (~$855)
+STRATEGIE ACTIVA:      METAL-ONLY (XAU + XAG) — simplificare 18.05 dupa review
+SIMBOLURI:             2 (XAUUSD.cfd SELL only, XAGUSD.cfd 0.01 lot fix)
+TARGET ZILNIC:         $50-80/zi pe baza performanta reala metale
+DD MAX ACCEPTABIL:     10% (~$570) — mai conservator fara stocks
 TIMEZONE VPS:          GTB Standard Time (UTC+2 RO) — schimbat 2026-05-11
-COMMIT ACTIV VPS:      a8ff509 (HIBRID + force-close stocks)
-COMMIT PENDING:        d631bcb (fix cooldown) — DEPLOY luni 19 mai
-NEXT REVIEW:           19 mai 2026 (luni)
-EARNINGS NEXT:         AMD 06.05 (trecut), MSFT 28.10, NFLX 17.04
-FORCE CLOSE STOCKS:    22:55 RO automat (chiar pe minus) — testat vineri 16.05
-SWAP PROTECTION:       Mier+Vin 22:55 (VERIFICA Task Scheduler dupa deploy!)
+COMMIT PENDING DEPLOY: (acest commit — METAL-ONLY + fix cooldown d631bcb)
+PERFORMANTA REVIEW:    Week 11-15.05: NET -$10 (WR 40%) — metale +$80, stocks/forex -$90
+DECIZIE 2026-05-18:    A+B+C aprobat: scot stocks + USDCHF + USDCAD + GBPUSD
 USER PREFERENCES:      Romanian, decizii rapide, fara fluff, MAJUSCULE = in graba
 NU IMPLEMENTA fara:    Backtest 90+ zile + confirmare explicita user
-BUG-URI ACTIVE:        #8 cooldown (fix committed nedeployat)
-                       #9 re-entry dupa TP (nedecis)
-                       #10 USDCHF ranging false signals (lasam tracker)
+BUG-URI ACTIVE:        #7 force-close: FIXED + DEPLOYED (testat joi 14.05 ✓)
+                       #8 cooldown: fix committed, deploy odata cu METAL-ONLY
+                       #10 USDCHF ranging — REZOLVAT prin scoatere simbol
+                       #11 stocks weekend retry — REZOLVAT prin scoatere stocks
+TASK SCHEDULER VPS:    close_swap_protection_wed/fri fired la 23:55 (gresit)
+                       — DE RECREAT cu timpul corect 22:55 RO
 ```
 
 ---

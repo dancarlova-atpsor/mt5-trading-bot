@@ -5,22 +5,12 @@
 trend_following:
   enabled: true
   timeframe: "H1"
-  # CONFIG HIBRID + STOCKS (2026-05-07): forex/metals + 7 stocks profitabile
-  # Backtest 90d estimat: $48-69/zi
+  # CONFIG METAL-ONLY (2026-05-18) — review saptamana 11-15 mai post-deploy:
+  # Metale +$80 (80% WR) — singurele profitabile pe demo real.
+  # Stocks/forex au pierdut: scoase.
   symbols:
-    # Forex/metals (4)
     - XAUUSD.cfd     # SELL only (filter swap), R:R 3.0
-    - USDCHF.cfd     # R:R 3.0 (status quo)
-    - USDCAD.cfd     # R:R 1.5 + filtru D1
-    - XAGUSD.cfd     # REACTIVAT, R:R 1.5, lot fix 0.01
-    # Stocks US (7) — backtest 90d toate profitabile
-    - NFLX.cfd       # +$300 (R:R 3.0, WR 57%)
-    - INTC.cfd       # +$293 (R:R 3.0, WR 50%)
-    - GOOGL.cfd      # +$284 (R:R 3.0, WR 39%)
-    - AMD.cfd        # +$269 (R:R 1.5, WR 63%)
-    - ORCL.cfd       # +$211 (R:R 3.0, WR 50%)
-    - MSFT.cfd       # +$165 (R:R 3.0, WR 40%)
-    - AMZN.cfd       # +$149 (R:R 3.0, WR 33%)
+    - XAGUSD.cfd     # R:R 1.5, lot fix 0.01
   # Defaults (folosit daca simbolul nu are override)
   ema_fast: 20
   ema_slow: 50
@@ -31,32 +21,11 @@ trend_following:
   adx_period: 14
   # Override per simbol
   symbol_overrides:
-    # === FOREX / METALS ===
-    AUDUSD.cfd:
-      ema_fast: 15
-      ema_slow: 70
-    EURGBP.cfd:
-      ema_fast: 15
-      ema_slow: 70
-      adx_threshold: 30
     XAUUSD.cfd:
       ema_fast: 10
       ema_slow: 70
       adx_threshold: 30
-    USDCHF.cfd:
-      ema_fast: 10
-      ema_slow: 30
-    USDCAD.cfd:
-      ema_fast: 15
-      ema_slow: 70
-      adx_threshold: 18
-      d1_filter: true        # NOU: filter D1 trend (din backtest D1 filter ajuta DOAR aici)
     XAGUSD.cfd:
-      ema_fast: 20
-      ema_slow: 50
-      adx_threshold: 25
-    # === STOCKS (parametri default 20/50/25 OK din backtest) ===
-    AMD.cfd:
       ema_fast: 20
       ema_slow: 50
       adx_threshold: 25
@@ -64,16 +33,14 @@ trend_following:
 breakout:
   enabled: true
   timeframe: "H1"
-  # CONFIG REAL 5300 EUR — 4 simboluri (mai putin EURUSD, AUDUSD, EURGBP)
+  # CONFIG METAL-ONLY (2026-05-18) — scos USDCHF/USDCAD/GBPUSD (perdere in saptamana real)
+  # Pastram XAU pentru breakout pe trenduri puternice
   symbols:
-    - GBPUSD.cfd     # Breakout +$2149 backtest 90d
-    - XAUUSD.cfd     # SELL only via filter
-    - USDCHF.cfd
-    - USDCAD.cfd
+    - XAUUSD.cfd     # SELL only via swap filter, breakout pe trenduri puternice
   lookback_period: 50
   atr_period: 14
   min_atr_ratio: 0.8
-  min_vol_ratio: 2.0         # OPTIMIZAT (era 1.2)
+  min_vol_ratio: 2.0
 
 macd_divergence:
   enabled: false             # Dezactivat 2026-04-17: backtest arata 0-1 trade pe simbol, pierdere
