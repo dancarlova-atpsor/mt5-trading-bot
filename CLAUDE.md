@@ -3,7 +3,7 @@
 > **Fisier critic.** Citeste-l in INTREGIME inainte sa propui modificari.
 > Userul (Dan, SC Luxuria Trans & Travel SRL) opereaza un bot de trading MT5 pe cont demo EarnBroker. Foloseste Romanian / Romglish in conversatii.
 
-Ultima actualizare: **2026-05-18** (decizia A+B+C: simplificare la METAL-ONLY dupa review saptamana 11-15 mai).
+Ultima actualizare: **2026-05-25 ora 19:50** (STRESS TEST complet — decizie OIL strategy pending).
 
 ---
 
@@ -974,6 +974,175 @@ BUG-URI ACTIVE:        #7 force-close: FIXED + DEPLOYED (testat joi 14.05 ✓)
 TASK SCHEDULER VPS:    close_swap_protection_wed/fri fired la 23:55 (gresit)
                        — DE RECREAT cu timpul corect 22:55 RO
 ```
+
+---
+
+---
+
+## 26. SESIUNE 2026-05-25 — STRESS TEST MASIV + DECIZIE OIL-STRATEGY (PENDING)
+
+### 26.1 Context
+- METAL-ONLY (XAU + XAG) deployed 2026-05-18
+- Week 18-25 mai: doar 5 trade-uri (3W/2L), NET -$7.66 (cvasi break-even)
+- User a cerut backtest comprehensiv pe noi simboluri/strategii inainte de schimbare
+
+### 26.2 Backtest 1: scan volatilitate (TOP 50 simboluri)
+Script: `backtesting/scan_volatility.py`
+Rezultat: TOP 50 cele mai volatile = 30 CRYPTO + 13 METALS + 5 COMMODITIES + 2 INDICES
+CSV: `results/volatility_scan.csv`
+
+### 26.3 Backtest 2: massive (30 simboluri × 3 strategii × 5 TF × 6 perioade)
+Script: `backtesting/massive_backtest.py`
+Simboluri testate (28):
+- Crypto: BTC, ETH, SOL, DSH, AVE
+- Metals: XAU, XAG, XPT, XPD, XAGEUR
+- Commodities: WTI, BRENT, COFFEE
+- Indices: NIKKEI, US2000
+- Forex (13): NZDUSD, AUDUSD, AUDJPY, NZDJPY, USDCHF, GBPUSD, USDJPY, CHFJPY, GBPJPY, GBPAUD, AUDCAD, EURUSD, EURGBP, USDCAD, EURJPY
+
+**BUG DETECTAT in primul run:** PnL inflate ~159× pe JPY pairs (formula calcula in JPY, eticheta USD).
+**Fix:** folosesc `mt5.symbol_info().trade_tick_value` pentru calcul corect USD. Commit local doar (nu in repo).
+
+CSV: `results/massive_backtest_20260525_1633.csv` (2700 rezultate, valori BUG pe JPY)
+
+### 26.4 Backtest 3: STRESS TEST cu risk constraints (DECISIV)
+Script: `backtesting/stress_test_full.py`
+Configurare:
+- 13 combinatii unice (sym × strategy) — din TOP 20 cu PnL fix aplicat
+- 5 TF: M15, M30, H1, H4, D1
+- 9 loturi: 0.02-0.10 in pasi de 0.01
+- 6 perioade: 30, 60, 90, 120, 150, 180 zile
+- **Constraints reale:**
+  - Daily loss limit -$53 (zi disabled)
+  - BLOW-UP threshold -$570 (10% din $5700)
+  - Commission $0.10/0.10 lot proportional
+
+**TOTAL: 585 backtests × 6 perioade = 3510 rezultate** (durata 110 min)
+CSV: `results/stress_test_20260525_1939.csv`
+Analiza: `backtesting/analyze_stress.py`
+
+### 26.5 REZULTATE STRESS TEST — CONCLUZII
+
+**BLOW-UPS detectate:** 1019 din 3510 (29%!). Multe combinatii crapa chiar la lot 0.02.
+
+**TOP 5 PROFITABILE (90 zile, NO blow-up):**
+
+| # | Simbol | Strategie | TF | Lot | Trades | WR | NET | Pe zi |
+|---|---|---|---|---:|---:|---:|---:|---:|
+| 1 | **BRENT** | **MeanReversion** | **H1** | **0.08** | 33 | 39% | **+$1519** | **+$17/zi** 🏆 |
+| 2 | BRENT | MeanReversion | H1 | 0.07 | 33 | 39% | +$1329 | +$15/zi |
+| 3 | BRENT | MeanReversion | H1 | 0.06 | 33 | 39% | +$1140 | +$13/zi |
+| 4 | **BRENT** | **Breakout** | **M15** | **0.08** | 76 | 40% | **+$1041** | **+$12/zi** |
+| 5 | BRENT | MeanReversion | H1 | 0.05 | 33 | 39% | +$950 | +$11/zi |
+
+**Top 5 LOT MAXIM SIGUR per combinatie:**
+- BRENT MeanRev H1: lot 0.08 (0.09 = BLOW-UP)
+- BRENT Breakout M15: lot 0.08 (0.09 = BLOW-UP)
+- WTI Breakout M15: lot 0.07 (0.08 = BLOW-UP)
+- WTI Breakout H1: lot 0.06 (0.07 = BLOW-UP)
+- XPTUSD MeanRev M15: lot 0.02 (0.03 = BLOW-UP)
+
+**DESCOPERIRI MAJORE:**
+1. ✅ **BRENT** = star absolut, profitabil pe TOATE perioadele 30-180 zile
+2. ✅ **WTI** = secondary winner pe Breakout
+3. ✅ **MeanReversion + Breakout** >> TrendFollowing pe oil
+4. ❌ **CRYPTO ZERO in top 30** (BTC, ETH, SOL nu apar deloc)
+5. ❌ **METALE crapa la lot mediu** (XAU MeanRev crapa la 0.02-0.03!)
+6. ❌ **TrendFollowing pe oil cracks la lot 0.02-0.03**
+
+### 26.6 STRATEGIE PROPUSA — OIL strategy
+
+**OPTIUNEA A: OIL-ONLY (BRENT + WTI)** — $45/zi estimat
+| # | Simbol | Strategie | TF | Lot | Estimare |
+|---|---|---|---|---:|---:|
+| 1 | BRENT | MeanReversion | H1 | 0.08 | +$17/zi |
+| 2 | BRENT | Breakout | M15 | 0.08 | +$12/zi |
+| 3 | WTI | Breakout | M15 | 0.07 | +$8.5/zi |
+| 4 | WTI | Breakout | H1 | 0.06 | +$7.3/zi |
+
+**OPTIUNEA B: OIL + XPTUSD CONSERVATOR** — $50/zi estimat
+- Optiune A + XPTUSD MeanReversion M15 lot 0.02 (+$5/zi)
+- Diversificare + €150/luna extra
+- Comisioane: 8% din profit XPTUSD (acceptabil)
+
+**Target user:** $50-80/zi (€55-85/zi).
+**Estimare realista 50-70% din backtest:** $25-35/zi (sub target).
+**Estimare optimista:** $40-50/zi (la marginea target).
+
+### 26.7 DECIZIE PENDING USER
+
+User a plecat la ora 19:55 spre casa. Astept raspuns la:
+
+**1) Setup ales:**
+- A) OIL-ONLY (simplu, $45/zi)
+- B) OIL + XPTUSD (mai complex, $50/zi)
+
+**2) Durata test:**
+- 1 saptamana (5 zile, sample mic)
+- 3 saptamani (recomand, sample relevant + kill-switch)
+- 1 luna (cel mai sigur statistic)
+
+### 26.8 IMPLEMENTARE NECESARA (cand user aproba)
+
+**Config (config/settings.yaml + strategies.yaml):**
+```yaml
+symbols: [BRENT.cfd, WTI.cfd, XPTUSD.cfd]  # daca B
+active_strategies: [trend_following, breakout, mean_reversion]  # mean_reversion NOU
+
+limits:
+  max_open_positions: 5      # era 3
+  max_daily_trades: 8        # era 3
+  max_positions_per_symbol: 2  # era 1 — BRENT poate avea 2 strategii simultan
+```
+
+**Cod (main.py):**
+- **MAJOR**: bot-ul actual ruleaza UN strategie/simbol. Pentru oil setup avem nevoie de
+  MeanReversion + Breakout pe ACELASI simbol (BRENT). Necesita modificari in `main.py`
+  pentru a permite strategie per (simbol, TF) combinatie.
+- Lot fix per (simbol, strategie, TF) — adaugare in risk_manager
+- Kill-switch DD -$200 (4% din cont)
+
+**Fisiere care vor fi modificate:**
+- `config/settings.yaml`
+- `config/strategies.yaml`
+- `risk/risk_manager.py` (lot per combinatie)
+- `main.py` (strategie per simbol)
+
+### 26.9 CHEAT SHEET ACTUALIZAT
+
+```
+BOT ACUM:              METAL-ONLY pe VPS (XAU+XAG), commit f07cd48 deployed 18.05
+PERFORMANCE 18-25.05:  5 trade-uri, NET -$7.66 (sub target)
+STRESS TEST COMPLET:   2026-05-25 19:39, 3510 rezultate in stress_test_20260525_1939.csv
+
+PROPUNERE NOUA:        OIL-ONLY sau OIL+XPTUSD (in dezbatere cu user)
+ESTIMARE PROFIT:       $25-50/zi realist (vs target $50-80)
+
+LOT MAX SIGUR confirm:
+  BRENT MeanRev H1:    0.08
+  BRENT Breakout M15:  0.08
+  WTI Breakout M15:    0.07
+  WTI Breakout H1:     0.06
+  XPTUSD MeanRev M15:  0.02
+
+BLOW-UPS in backtest:  29% combinatii (1019 din 3510)
+DECIZIA USER:          Pending (alege A vs B + 1/3/4 saptamani)
+
+NEXT STEP cand revine: User alege strategie → implementez cod + config → deploy VPS
+```
+
+### 26.10 Fisiere create azi (2026-05-25)
+- `backtesting/scan_volatility.py` — TOP 50 volatile
+- `backtesting/massive_backtest.py` — primul scan (cu PnL bug pe JPY)
+- `backtesting/stress_test_full.py` — DECISIV cu constraints
+- `backtesting/analyze_stress.py` — analiza CSV
+- `results/volatility_scan.csv`
+- `results/massive_backtest_20260525_1633.csv` (BUG, NU folosi)
+- `results/stress_test_20260525_1939.csv` ⭐ (CORECT)
+
+**IMPORTANT pentru sesiune noua Claude:**
+Cand revine user, citeste sectiunea 26 INTAI. Decizia OIL-strategy e pending.
+Asteapta user sa aleaga (A vs B) si durata test (1 sapt / 3 sapt / 1 luna), apoi implementeaza.
 
 ---
 
