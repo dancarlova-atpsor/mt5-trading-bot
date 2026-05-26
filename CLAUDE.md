@@ -3,7 +3,7 @@
 > **Fisier critic.** Citeste-l in INTREGIME inainte sa propui modificari.
 > Userul (Dan, SC Luxuria Trans & Travel SRL) opereaza un bot de trading MT5 pe cont demo EarnBroker. Foloseste Romanian / Romglish in conversatii.
 
-Ultima actualizare: **2026-05-26 ora 12:45** (DEPLOY OIL-ONLY: BRENT + WTI cu MeanReversion + Breakout, 3 saptamani test).
+Ultima actualizare: **2026-05-26 ora 12:55** (DEPLOY OIL-ONLY CONFIRMAT — bot ruleaza, repo private, XAGUSD legacy inchis manual).
 
 ---
 
@@ -1068,6 +1068,37 @@ Bot are deja:
 3. NET PnL real vs estimare
 4. Max DD experimentat
 5. Decizie: keep OIL / adauga XPTUSD / pivot
+
+### 27.10 DEPLOY EXECUTAT (26.05.2026 12:43:25 RO)
+
+**Confirmare bot pornit pe VPS:**
+- ✅ MT5 conectat: cont 9047479, balance $98,069
+- ✅ Strategie breakout: ['BRENT.cfd', 'WTI.cfd'] TF=M15
+- ✅ Strategie mean_reversion: ['BRENT.cfd'] TF=H1
+- ✅ trend_following dezactivat (skip in log)
+- ✅ SuperBot INITIALIZED | 2 simboluri
+- ✅ Performance tracker: 1 trade istoric incarcat
+- ✅ WTI detectat TRENDING la pornire
+- ✅ Repo GitHub PRIVATE inapoi
+- ✅ Process Python ID 2608 (160 MB RAM)
+
+**Curatare pozitii legacy:**
+- XAGUSD.cfd #43603291 SELL 0.01 lot (deschis 11:42:41 de bot vechi METAL) inchis manual de user
+- Profit lock-uit: +$0.70
+- Cont curat acum, doar pozitii viitoare OIL
+
+**Logging schedule asteptat:**
+- `[SuperBot #X]` summary la fiecare 20 min
+- `DeepAnalyzer` ciclu la fiecare 30 min
+- `news_calendar` update la fiecare 1 ora
+- `SEMNAL BUY/SELL` doar cand apare semnal real
+
+**Daca user vede 8-20 min de "tacere" in log — e NORMAL** (bot lucreaza, doar nu are semnale momentan).
+
+### 27.11 Status final saptamana 26.05
+Bot OIL-ONLY ruleaza live. Pana pe 02.06 lasam fara modificari.
+Daca apare ceva critic (Telegram tace 24h+, DD > -$200) → user spune.
+Daca normal → middle review pe 02.06.
 
 ---
 
