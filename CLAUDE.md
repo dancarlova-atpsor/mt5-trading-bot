@@ -3,7 +3,7 @@
 > **Fisier critic.** Citeste-l in INTREGIME inainte sa propui modificari.
 > Userul (Dan, SC Luxuria Trans & Travel SRL) opereaza un bot de trading MT5 pe cont demo EarnBroker. Foloseste Romanian / Romglish in conversatii.
 
-Ultima actualizare: **2026-05-25 ora 19:50** (STRESS TEST complet — decizie OIL strategy pending).
+Ultima actualizare: **2026-05-26 ora 12:45** (DEPLOY OIL-ONLY: BRENT + WTI cu MeanReversion + Breakout, 3 saptamani test).
 
 ---
 
@@ -957,25 +957,117 @@ Pe broker EarnBroker exista (din `pips_to_price`):
 ## 25. Quick reference card (cheat sheet)
 
 ```
-STRATEGIE ACTIVA:      METAL-ONLY (XAU + XAG) — simplificare 18.05 dupa review
-SIMBOLURI:             2 (XAUUSD.cfd SELL only, XAGUSD.cfd 0.01 lot fix)
-TARGET ZILNIC:         $50-80/zi pe baza performanta reala metale
-DD MAX ACCEPTABIL:     10% (~$570) — mai conservator fara stocks
-TIMEZONE VPS:          GTB Standard Time (UTC+2 RO) — schimbat 2026-05-11
-COMMIT PENDING DEPLOY: (acest commit — METAL-ONLY + fix cooldown d631bcb)
-PERFORMANTA REVIEW:    Week 11-15.05: NET -$10 (WR 40%) — metale +$80, stocks/forex -$90
-DECIZIE 2026-05-18:    A+B+C aprobat: scot stocks + USDCHF + USDCAD + GBPUSD
+STRATEGIE ACTIVA:      OIL-ONLY (BRENT + WTI) — deploy 2026-05-26
+SIMBOLURI:             2 (BRENT.cfd lot 0.08, WTI.cfd lot 0.07)
+STRATEGII:             Breakout M15 (BRENT+WTI), MeanReversion H1 (BRENT)
+TARGET ZILNIC:         $20-45/zi realist (backtest estimat $45/zi)
+DD MAX ACCEPTABIL:     10% (~$570)
+DURATA TEST:           3 saptamani (26.05 → 16.06.2026)
+TIMEZONE VPS:          GTB Standard Time (UTC+2 RO)
+PERFORMANTA ISTORIC:   Week 11-15.05 METAL: NET -$10 (WR 40%)
+                       Week 18-25.05 METAL: NET -$8 (5 trades doar)
+                       OIL strategy ASTEAPTA validare in live
 USER PREFERENCES:      Romanian, decizii rapide, fara fluff, MAJUSCULE = in graba
 NU IMPLEMENTA fara:    Backtest 90+ zile + confirmare explicita user
-BUG-URI ACTIVE:        #7 force-close: FIXED + DEPLOYED (testat joi 14.05 ✓)
-                       #8 cooldown: fix committed, deploy odata cu METAL-ONLY
-                       #10 USDCHF ranging — REZOLVAT prin scoatere simbol
-                       #11 stocks weekend retry — REZOLVAT prin scoatere stocks
-TASK SCHEDULER VPS:    close_swap_protection_wed/fri fired la 23:55 (gresit)
-                       — DE RECREAT cu timpul corect 22:55 RO
+BUG-URI REZOLVATE:     #7 force-close stocks (irelevant - fara stocks)
+                       #8 cooldown
+                       #10 USDCHF (irelevant - fara forex)
+                       #11 stocks weekend (irelevant - fara stocks)
+TASK SCHEDULER VPS:    close_swap_protection — IRELEVANT pe OIL
+                       (oil = intraday in mare parte, swap mic)
+                       Dar TF M15+H1 inseamna swap POATE aparea daca tine peste noapte
 ```
 
 ---
+
+---
+
+## 27. SESIUNE 2026-05-26 — DEPLOY OIL-ONLY (decizia user: A + 3 saptamani)
+
+### 27.1 Decizie finala user (26.05 ora 12:30)
+- **A) OIL-ONLY** (BRENT + WTI, fara XPTUSD pentru simplitate)
+- **Durata test: 3 saptamani** (26 mai → 16 iunie 2026)
+- Compromis intre feedback rapid si sample size relevant
+
+### 27.2 Configuratie deployed
+
+**settings.yaml:**
+```yaml
+symbols: [BRENT.cfd, WTI.cfd]
+active_strategies: [breakout, mean_reversion]
+```
+
+**strategies.yaml:**
+```yaml
+trend_following:  enabled: false  # DEZACTIVAT (slab pe oil)
+breakout:         enabled: true,  timeframe: M15, symbols: [BRENT, WTI]
+mean_reversion:   enabled: true,  timeframe: H1,  symbols: [BRENT]
+```
+
+**risk_management.yaml:**
+```yaml
+volume_overrides:
+  BRENT.cfd: 0.08   # MeanRev H1 + Breakout M15 (BLOW-UP la 0.09)
+  WTI.cfd:   0.07   # Breakout M15 (BLOW-UP la 0.08)
+limits:
+  max_open_positions: 4
+  max_positions_per_symbol: 2   # BRENT poate avea 2 strategii simultan
+  max_daily_trades: 8
+  max_daily_loss_percent: 3.0   # 3% (era 2%) pentru oil DD natural
+```
+
+### 27.3 Arhitectura confirmata
+Bot-ul `main.py::load_strategies` deja suporta multi-strategy per symbol prin loop separat
+peste fiecare strategie activa. BRENT va avea:
+- Breakout M15 verificat la check_interval
+- MeanReversion H1 verificat la check_interval
+Cu `max_positions_per_symbol: 2`, BRENT poate tine ambele pozitii deschise simultan.
+
+`risk_manager.calculate_position_size` returneaza direct `volume_overrides[symbol]` daca
+exista (nu mai face calcul percent_risk), deci lot fix 0.08/0.07 e respectat exact.
+
+### 27.4 Verificare broker pre-deploy
+- BRENT.cfd: bid $96.353, ask $96.378, spread 25 ticks (0.026%), contract 1000, tick_value $1.00
+- WTI.cfd: bid $91.884, ask $91.914, spread 30 ticks (0.033%), contract 1000, tick_value $1.00
+- Ambele visible si tranzactionabile pe demo 9047479
+
+### 27.5 Expunere si margin
+Pentru lot 0.08 BRENT la $96:
+- Expunere = 0.08 × 1000 × 96 = $7,680
+- Cu leverage 1:100: margin requirement = $76.80 — OK pe cont $5,700
+
+Pentru lot 0.07 WTI la $92:
+- Expunere = 0.07 × 1000 × 92 = $6,440
+- Margin = $64.40 — OK
+
+### 27.6 Plan implementare
+**Pe LAPTOP (DONE):**
+- ✅ config/settings.yaml updated
+- ✅ config/strategies.yaml updated (mean_reversion ACTIVAT, TF-uri schimbate)
+- ✅ config/risk_management.yaml updated (volume_overrides + limits)
+- ✅ CLAUDE.md actualizat (sectiunea 27)
+- ⏳ Commit + push pe GitHub (next)
+- ⏳ User: make repo public temporar pentru deploy
+- ⏳ User: deploy pe VPS via download zip + restart bot
+
+### 27.7 KILL-SWITCH pe perioada test
+Bot are deja:
+- `max_daily_loss_eur: 53` → opreste daca pierde €53/zi
+- `max_daily_loss_percent: 3.0` → opreste daca pierde 3% din $5700 = -$171/zi
+
+**Daca pe 7 zile DD total > -$300 (5%), user e notificat → review pe loc.**
+
+### 27.8 Asteptari realiste (3 saptamani)
+- Estimare backtest: $45/zi × 15 zile trading = +$675
+- Estimare realista 50-70%: $20-30/zi = $300-450 in 3 saptamani
+- Worst case: pierdere $100-200 (DD permis) → revertim la METAL-ONLY sau alt setup
+
+### 27.9 Verificare la final (16.06.2026)
+1. Trade-uri total executate (target 50-100)
+2. WR per (sym, strategie) — comparam cu backtest (~39-40%)
+3. NET PnL real vs estimare
+4. Max DD experimentat
+5. Decizie: keep OIL / adauga XPTUSD / pivot
 
 ---
 

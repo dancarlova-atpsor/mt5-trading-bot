@@ -3,15 +3,9 @@
 # ============================================
 
 trend_following:
-  enabled: true
+  enabled: false   # DEZACTIVAT 2026-05-26 — stress test arata TF slab pe oil
   timeframe: "H1"
-  # CONFIG METAL-ONLY (2026-05-18) — review saptamana 11-15 mai post-deploy:
-  # Metale +$80 (80% WR) — singurele profitabile pe demo real.
-  # Stocks/forex au pierdut: scoase.
-  symbols:
-    - XAUUSD.cfd     # SELL only (filter swap), R:R 3.0
-    - XAGUSD.cfd     # R:R 1.5, lot fix 0.01
-  # Defaults (folosit daca simbolul nu are override)
+  symbols: []
   ema_fast: 20
   ema_slow: 50
   macd_fast: 12
@@ -19,28 +13,20 @@ trend_following:
   macd_signal: 9
   adx_threshold: 25
   adx_period: 14
-  # Override per simbol
-  symbol_overrides:
-    XAUUSD.cfd:
-      ema_fast: 10
-      ema_slow: 70
-      adx_threshold: 30
-    XAGUSD.cfd:
-      ema_fast: 20
-      ema_slow: 50
-      adx_threshold: 25
 
 breakout:
   enabled: true
-  timeframe: "H1"
-  # CONFIG METAL-ONLY (2026-05-18) — scos USDCHF/USDCAD/GBPUSD (perdere in saptamana real)
-  # Pastram XAU pentru breakout pe trenduri puternice
+  timeframe: "M15"    # SCHIMBAT din H1 in M15 — stress test confirma M15 optim pe oil
+  # CONFIG OIL-ONLY (2026-05-26):
+  # BRENT Breakout M15 lot 0.08 = +$12/zi
+  # WTI Breakout M15 lot 0.07 = +$8.5/zi
   symbols:
-    - XAUUSD.cfd     # SELL only via swap filter, breakout pe trenduri puternice
+    - BRENT.cfd      # Lot 0.08 (vezi volume_overrides in risk_management.yaml)
+    - WTI.cfd        # Lot 0.07
   lookback_period: 50
   atr_period: 14
   min_atr_ratio: 0.8
-  min_vol_ratio: 2.0
+  min_vol_ratio: 1.5    # Relaxat de la 2.0 (M15 are vol mai mic decat H1)
 
 macd_divergence:
   enabled: false             # Dezactivat 2026-04-17: backtest arata 0-1 trade pe simbol, pierdere
@@ -67,9 +53,13 @@ news_sentiment:
   min_score: 0.3
 
 mean_reversion:
-  enabled: false
+  enabled: true       # ACTIVAT 2026-05-26 — best performer din stress test
   timeframe: "H1"
-  symbols: []
+  # CONFIG OIL-ONLY:
+  # BRENT MeanReversion H1 lot 0.08 = +$17/zi (cel mai profitabil din toate!)
+  # WTI nu este in mean_reversion (Breakout e mai bun)
+  symbols:
+    - BRENT.cfd       # Lot 0.08 (R:R 2.0 default din risk_management.yaml)
   rsi_period: 14
   rsi_oversold: 30
   rsi_overbought: 70

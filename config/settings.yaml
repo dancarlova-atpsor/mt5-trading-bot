@@ -10,25 +10,25 @@ account:
   magic_number: 123456      # ID unic pentru ordinele botului
 
 symbols:
-  # CONFIG METAL-ONLY (2026-05-18) — review saptamana 11-15 mai:
-  # Performance REALA: metale +$80 (80% WR), stocks -$53 (14% WR), USDCHF -$36 (0% WR)
-  # Backtest 90d a fost optimist pe stocks — realitatea inversata.
-  # User decizie A+B+C: scot stocks + USDCHF + USDCAD + GBPUSD. Pastrez doar XAU + XAG.
-  - XAUUSD.cfd       # SELL only (filter swap), R:R 3.0 — 2W in 15.05 +$17.55
-  - XAGUSD.cfd       # lot fix 0.01, R:R 1.5 — 3W in 14-15.05 +$62.90
-  # SCOASE 2026-05-18 (review post-deploy):
-  # - USDCHF.cfd     # 0/2 WR saptamana asta, -$36.71 (Bug #10 ranging false signals)
-  # - USDCAD.cfd     # 0 trade-uri reusite saptamana asta
-  # - GBPUSD.cfd     # 0 trade-uri reusite saptamana asta (doar breakout configurat)
-  # - NFLX, INTC, AMD, AMZN, MSFT, GOOGL, ORCL — total -$53.50 (14% WR)
-  # - Bug #11 (stocks deschise duminica retry spam) eliminat odata cu stocks
+  # CONFIG OIL-ONLY (2026-05-26) — STRESS TEST 25.05 confirmat:
+  # BRENT MeanReversion H1 lot 0.08 = +$17/zi (best!)
+  # BRENT Breakout M15 lot 0.08 = +$12/zi
+  # WTI Breakout M15 lot 0.07 = +$8.5/zi
+  # Total estimat: ~$37-45/zi (realist 50-70% = $20-30/zi)
+  # Test durata: 3 saptamani (26.05 - 16.06)
+  - BRENT.cfd        # MeanReversion H1 + Breakout M15, lot 0.08
+  - WTI.cfd          # Breakout M15, lot 0.07
+  # SCOASE 2026-05-26 (post stress test):
+  # - XAUUSD.cfd     # MeanReversion crapa la lot 0.02 (Bug DD)
+  # - XAGUSD.cfd     # Crapa similar la lot mediu
+  # - XPTUSD.cfd     # Dropped pentru simplitate (era +$5/zi extra)
 
 active_strategies:
-  - trend_following
-  - breakout
-  # - news_sentiment        # Dezactivat 2026-04-17: overnight a dus la pierderi
-  # - macd_divergence       # Dezactivat: backtest 0-1 trade/simbol, nu produce signal
-  # - mean_reversion
+  - breakout         # M15 pe BRENT + WTI
+  - mean_reversion   # H1 pe BRENT (ACTIVAT NOU 2026-05-26)
+  # - trend_following  # DEZACTIVAT — slab pe oil din stress test
+  # - news_sentiment
+  # - macd_divergence
   # - scalping
 
 execution:

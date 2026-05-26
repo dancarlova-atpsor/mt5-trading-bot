@@ -11,17 +11,13 @@ position_sizing:
   max_lot: 0.10             # Max 0.10 lot pe cont 5300 EUR (siguranta)
 
   # Volum fix per simbol (override pe calculul automat)
+  # OIL-ONLY (2026-05-26) — loturi optime din stress test
   volume_overrides:
-    XAUUSD.cfd: 0.02        # Aur — volum redus pt cont mic
-    XAGUSD.cfd: 0.01        # Argint — lot fix mic (volatilitate mare, limit DD)
-    # Stocks US — lot fix mic (1-5 actiuni / trade, dimensionat la pret)
-    NFLX.cfd:  0.01         # ~1 actiune NFLX ~$700 expunere
-    INTC.cfd:  0.05         # ~5 actiuni INTC ~$125 expunere
-    GOOGL.cfd: 0.02         # ~2 actiuni GOOGL ~$400 expunere
-    AMD.cfd:   0.03         # ~3 actiuni AMD ~$450 expunere
-    ORCL.cfd:  0.02         # ~2 actiuni ORCL ~$340 expunere
-    MSFT.cfd:  0.01         # ~1 actiune MSFT ~$500 expunere
-    AMZN.cfd:  0.02         # ~2 actiuni AMZN ~$440 expunere
+    BRENT.cfd: 0.08         # MeanRev H1 + Breakout M15, BLOW-UP la 0.09 confirmat
+    WTI.cfd:   0.07         # Breakout M15, BLOW-UP la 0.08 confirmat
+    # Vechi (scoase):
+    # XAUUSD.cfd: 0.02
+    # XAGUSD.cfd: 0.01
 
 stop_loss:
   default_pips: 50
@@ -52,8 +48,12 @@ trailing_stop:
   trail_pips: 15
 
 limits:
-  max_open_positions: 3           # Max 3 pozitii simultan (cont mic)
-  max_positions_per_symbol: 1     # Doar 1 pozitie per simbol (evita stacking)
-  max_daily_loss_percent: 2.0    # 2% (era 1%) — permite drawdown XAG/stocks fara stop bot
-  max_daily_trades: 5             # Crescut de la 3 — mai multe simboluri (forex+stocks)
-  max_correlation_exposure: 2    # Max 2 pozitii pe perechi corelate
+  # OIL-ONLY (2026-05-26):
+  # BRENT poate avea 2 pozitii simultan (MeanRev H1 + Breakout M15)
+  # WTI poate avea 1 pozitie (Breakout M15)
+  # Total max activ: 3 (2 BRENT + 1 WTI)
+  max_open_positions: 4           # Buffer +1 (era 3)
+  max_positions_per_symbol: 2     # BRENT poate avea Breakout + MeanRev simultan (era 1)
+  max_daily_loss_percent: 3.0    # 3% (era 2%) — pe oil DD natural mai mare
+  max_daily_trades: 8             # Crescut de la 5 (oil produce mai multe semnale)
+  max_correlation_exposure: 2    # BRENT-WTI sunt corelate, dar trade-uri pe ambele OK
