@@ -16,17 +16,17 @@ trend_following:
 
 breakout:
   enabled: true
-  timeframe: "M15"    # SCHIMBAT din H1 in M15 — stress test confirma M15 optim pe oil
-  # CONFIG OIL-ONLY (2026-05-26):
-  # BRENT Breakout M15 lot 0.08 = +$12/zi
-  # WTI Breakout M15 lot 0.07 = +$8.5/zi
+  timeframe: "M30"    # OPTIMIZAT 2026-05-28: M30 >> M15 pe oil
+  # Test 28.05: BRENT Breakout M30 = +$1109/90zi (vs M15 = -$134 PIERDERE!)
+  #             WTI Breakout M30 = +$291/90zi (vs M15 +$546, dar M30 OK pt simplitate)
+  # OPTIUNEA A (config simplu, ambele pe M30). B (WTI pe H1 +$657) ramane pt dupa 3 sapt.
   symbols:
-    - BRENT.cfd      # Lot 0.08 (vezi volume_overrides in risk_management.yaml)
+    - BRENT.cfd      # Lot 0.08 — M30 e cel mai profitabil TF pentru BRENT breakout
     - WTI.cfd        # Lot 0.07
   lookback_period: 50
   atr_period: 14
   min_atr_ratio: 0.8
-  min_vol_ratio: 1.5    # Relaxat de la 2.0 (M15 are vol mai mic decat H1)
+  min_vol_ratio: 1.5
 
 macd_divergence:
   enabled: false             # Dezactivat 2026-04-17: backtest arata 0-1 trade pe simbol, pierdere
@@ -53,13 +53,14 @@ news_sentiment:
   min_score: 0.3
 
 mean_reversion:
-  enabled: true       # ACTIVAT 2026-05-26 — best performer din stress test
+  enabled: true       # ACTIVAT 2026-05-26
   timeframe: "H1"
-  # CONFIG OIL-ONLY:
-  # BRENT MeanReversion H1 lot 0.08 = +$17/zi (cel mai profitabil din toate!)
-  # WTI nu este in mean_reversion (Breakout e mai bun)
+  # CONFIG OIL (optimizat 2026-05-28):
+  # BRENT MeanReversion H1 = +$751/90zi
+  # WTI MeanReversion H1 = +$393/90zi (ADAUGAT 2026-05-28 — era lipsa!)
   symbols:
-    - BRENT.cfd       # Lot 0.08 (R:R 2.0 default din risk_management.yaml)
+    - BRENT.cfd       # +$751/90zi
+    - WTI.cfd         # +$393/90zi (NOU 2026-05-28)
   rsi_period: 14
   rsi_oversold: 30
   rsi_overbought: 70

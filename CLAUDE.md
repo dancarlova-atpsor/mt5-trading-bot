@@ -3,7 +3,7 @@
 > **Fisier critic.** Citeste-l in INTREGIME inainte sa propui modificari.
 > Userul (Dan, SC Luxuria Trans & Travel SRL) opereaza un bot de trading MT5 pe cont demo EarnBroker. Foloseste Romanian / Romglish in conversatii.
 
-Ultima actualizare: **2026-05-26 ora 12:55** (DEPLOY OIL-ONLY CONFIRMAT — bot ruleaza, repo private, XAGUSD legacy inchis manual).
+Ultima actualizare: **2026-05-28 ora 11:30** (OPTIMIZARE A: breakout M15→M30, WTI MeanRev adaugat. Estimare $28/zi dublu).
 
 ---
 
@@ -1099,6 +1099,42 @@ Bot are deja:
 Bot OIL-ONLY ruleaza live. Pana pe 02.06 lasam fara modificari.
 Daca apare ceva critic (Telegram tace 24h+, DD > -$200) → user spune.
 Daca normal → middle review pe 02.06.
+
+### 27.12 OPTIMIZARE 2026-05-28 (dupa 0 trade-uri 2 zile)
+
+**Problema:** Bot 0 trade-uri 26-28 mai. User a facut +$280 manual pe BRENT (0.3 lot, dip-buy).
+Log arata: NICIUN SEMNAL generat (strategiile prea stricte pt piata curenta).
+
+**Backtest diagnostic (compare_params.py + test_breakout_tf.py):**
+1. Relaxarea params STRICA profitul (RELAXAT -$471 vs STRICT +$1678)
+2. TrendFollowing pe oil = catastrofal (-$2046) — confirmat dezactivat
+3. **DESCOPERIRE:** BRENT Breakout M15 = -$134 (PIERDERE!) vs M30 = +$1109!
+4. WTI MeanRev H1 = +$393 era LIPSA din config
+
+**Breakout pe toate TF (90 zile):**
+| Symbol | M15 | M30 | H1 | H4 |
+|---|---:|---:|---:|---:|
+| BRENT | -$134 | **+$1109** | -$201 | -$70 |
+| WTI | +$546 | +$291 | **+$657** | -$114 |
+
+**DECIZIE user: A acum, B dupa 3 saptamani**
+
+**OPTIUNEA A aplicata 2026-05-28 (config only):**
+```yaml
+breakout:       timeframe: M30 (era M15!), symbols: [BRENT, WTI]
+mean_reversion: timeframe: H1,  symbols: [BRENT, WTI]  # WTI adaugat
+```
+
+Estimare A: +$2544/90zi = **$28/zi** (dublu fata de $13/zi config M15).
+
+**OPTIUNEA B (PENDING dupa 3 sapt):** TF per simbol (BRENT M30 + WTI H1) = +$2910/90zi = $32/zi.
+Necesita COD: `symbol_tf_overrides` in strategies.yaml + main.py citeste TF per simbol (~1h).
+
+### 27.13 Note importante 2026-05-28
+- **Cont REAL exista in MT5: 700709 (CJ-28170839).** Bot ruleaza pe DEMO 9047479. NU activa pe real pana dupa 3 sapt profit confirmat!
+- **Contabo VPS vechi se sterge automat 29.05** (€12/luna economisiti). User nu face nimic.
+- User a inchis manual XAGUSD legacy (+$0.70).
+- **0 trade-uri 2 zile = variance** (backtest 3.32 trade/zi mediu, dar distributie neuniforma).
 
 ---
 
