@@ -3,7 +3,7 @@
 > **Fisier critic.** Citeste-l in INTREGIME inainte sa propui modificari.
 > Userul (Dan, SC Luxuria Trans & Travel SRL) opereaza un bot de trading MT5 pe cont demo EarnBroker. Foloseste Romanian / Romglish in conversatii.
 
-Ultima actualizare: **2026-05-28 ora 11:30** (OPTIMIZARE A: breakout M15→M30, WTI MeanRev adaugat. Estimare $28/zi dublu).
+Ultima actualizare: **2026-06-02 ora 19:20** (FIX SuperBot QUIET filter blocaj — 6 zile 0 trade-uri pe oil rezolvat).
 
 ---
 
@@ -1135,6 +1135,44 @@ Necesita COD: `symbol_tf_overrides` in strategies.yaml + main.py citeste TF per 
 - **Contabo VPS vechi se sterge automat 29.05** (€12/luna economisiti). User nu face nimic.
 - User a inchis manual XAGUSD legacy (+$0.70).
 - **0 trade-uri 2 zile = variance** (backtest 3.32 trade/zi mediu, dar distributie neuniforma).
+
+### 27.14 BUG #12 — SuperBot QUIET filter blocheaza 100% pe oil calm (FIX 2026-06-02)
+
+**Simptom:** 6 zile (28.05 - 02.06) ZERO trade-uri pe BRENT/WTI desi bot ruleaza continuu.
+
+**Diagnostic din log:**
+```
+2026-06-02 11:52 [SuperBot #3600] BRENT.cfd:QUIET/None/x0.0, WTI.cfd:QUIET/None/x0.0
+2026-06-02 14:52 [SuperBot #3690] BRENT.cfd:QUIET/None/x0.0, WTI.cfd:RANGING/breakout/x0.7
+2026-06-02 17:52 [SuperBot #3780] BRENT.cfd:RANGING/breakout/x0.7, WTI.cfd:RANGING/breakout/x0.7
+```
+
+BRENT a fost QUIET TOATA ZIUA pana la 17:52! WTI similar. SuperBot regime detector
+clasifica volatilitate < P20 ca QUIET → `strategy=None, size_mult=0.0` → SKIP TOTAL.
+
+**Root cause:**
+- Oil-ul ultima saptamana = exceptional de calm (DOE inventories no surprises, OPEC stabile)
+- SuperBot `quiet_percentile_low: 20` declanseaza pe orice volatilitate sub P20
+- `skip_quiet: true` + `QUIET: 0.0` = nu mai face NICIUN trade
+
+**Backtest-ul NU a simulat SuperBot regime filter!** Stress test si massive_backtest
+foloseau strategie raw (Breakout.analyze + MeanReversion.analyze) FARA gate SuperBot.
+In LIVE, SuperBot gate_trade blocheaza inainte ca semnalul sa ajunga la order.
+
+**Fix aplicat (settings.yaml superbot.calibrator):**
+```yaml
+regime_size_mult:
+  QUIET: 0.5         # era 0.0
+  UNKNOWN: 0.5       # era 0.0
+skip_quiet: false    # era true
+```
+
+**Efect:**
+- Bot va tranzactiona si pe regim QUIET cu lot 50% (0.04 pe BRENT, 0.035 pe WTI)
+- Aliniaza live-ul cu backtest (care nu filtra QUIET)
+- Risc: lot mai mic pe QUIET = profit mai mic per trade, dar **macar exista trade-uri**
+
+**TODO viitor:** simulare SuperBot in backtest pentru estimari live realiste.
 
 ---
 

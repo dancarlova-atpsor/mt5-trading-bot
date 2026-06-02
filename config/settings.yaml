@@ -106,9 +106,9 @@ superbot:
       TRENDING: 1.3
       RANGING: 0.7
       VOLATILE: 0.5
-      QUIET: 0.0
-      UNKNOWN: 0.0
-    skip_quiet: true
+      QUIET: 0.5         # FIX 2026-06-02: era 0.0 — oil ramane in QUIET multe zile, blocaj total
+      UNKNOWN: 0.5       # era 0.0 — permite trade-uri si pe regim incert
+    skip_quiet: false    # FIX 2026-06-02: era true — nu mai SKIP total pe QUIET
     low_perf_penalty: 0.7
     min_perf_win_rate: 45
 
