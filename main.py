@@ -71,19 +71,24 @@ def load_strategies(strategies_config: dict, active_list: list) -> list[dict]:
         strategy = cls(cfg)
         symbols = cfg.get("symbols", [])
         timeframe = cfg.get("timeframe", "H1")
+        symbol_tf_overrides = cfg.get("symbol_tf_overrides", {}) or {}
 
         loaded.append({
             "strategy": strategy,
             "symbols": symbols,
             "timeframe": timeframe,
+            "symbol_tf_overrides": symbol_tf_overrides,
             "name": name,
         })
-        logger.info(f"Strategie incarcata: {name} | Simboluri: {symbols} | TF: {timeframe}")
+        if symbol_tf_overrides:
+            logger.info(f"Strategie incarcata: {name} | Simboluri: {symbols} | TF default: {timeframe} | Overrides: {symbol_tf_overrides}")
+        else:
+            logger.info(f"Strategie incarcata: {name} | Simboluri: {symbols} | TF: {timeframe}")
 
     return loaded
 
 
-def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts: float, symbol_last_close_time: dict = None) -> float:
+def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts: float, symbol_last_close_time: dict = None, risk_manager=None) -> float:
     """Polls broker's deals history si feed-uieste pozitiile inchise noi in SuperBot.
 
     Detecteaza TOATE inchiderile (SL, TP, manual, trailing) — nu doar cele initiate de cod.
@@ -158,6 +163,12 @@ def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts:
                     # Bug fix 2026-05-11: foloseste time.time() local NU broker time
                     # (broker time poate fi in alt timezone — cooldown failed pe INTC)
                     symbol_last_close_time[symbol] = time.time()
+                # NOU 2026-07-01: feed per-symbol PnL to risk_manager pt daily loss limit
+                if risk_manager is not None:
+                    try:
+                        risk_manager.record_trade(pnl, symbol=symbol)
+                    except Exception as e:
+                        logger.error(f"risk_manager.record_trade feed error: {e}")
             except Exception as e:
                 logger.error(f"on_trade_closed feed error: {e}")
 
@@ -429,6 +440,7 @@ def main():
                         superbot_magic,
                         superbot_last_poll_ts,
                         symbol_last_close_time=symbol_last_close_time,
+                        risk_manager=risk_manager,
                     )
 
                 # ============================================
@@ -485,6 +497,8 @@ def main():
                             result = order_manager.close_position(pos["ticket"], comment="trailing_profit")
                             if result.success:
                                 profit_manager.record_position_close(pos["ticket"], pos["profit"])
+                                # NOU 2026-07-01: track per-symbol PnL pentru daily loss limit
+                                risk_manager.record_trade(pos["profit"], symbol=pos["symbol"])
                                 notifier.notify_trade_closed(
                                     pos["symbol"], pos["type"], pos["profit"], 0
                                 )
@@ -511,9 +525,19 @@ def main():
                 for strat_info in strategies:
                     strategy = strat_info["strategy"]
                     symbols = strat_info["symbols"]
-                    timeframe = strat_info["timeframe"]
+                    default_timeframe = strat_info["timeframe"]
+                    tf_overrides = strat_info.get("symbol_tf_overrides", {}) or {}
 
                     for symbol in symbols:
+                        # NOU 2026-07-01: TF per simbol (override daca exista)
+                        timeframe = tf_overrides.get(symbol, default_timeframe)
+
+                        # NOU 2026-07-01: per-symbol daily loss check (izolare)
+                        sym_disabled, sym_reason = risk_manager.is_symbol_disabled_today(symbol)
+                        if sym_disabled:
+                            logger.info(f"[SYMBOL DISABLED] {symbol}: {sym_reason} — skip azi")
+                            continue
+
                         # Stock market hours check — stocks doar intre 16:30-22:55 RO
                         if symbol in stock_symbols:
                             if not is_trading_hours(stock_trading_hours, timezone_str):
@@ -666,7 +690,7 @@ def main():
                             signal_bridge.clear_signal()
 
                         if executed:
-                            risk_manager.record_trade(0)
+                            risk_manager.record_trade(0, symbol=symbol)
                             open_positions = order_manager.get_open_positions()
                             notifier.notify_trade_opened(
                                 symbol, direction, volume, current_price, sl, tp, strategy.name

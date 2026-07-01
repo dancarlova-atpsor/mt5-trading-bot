@@ -10,26 +10,21 @@ account:
   magic_number: 123456      # ID unic pentru ordinele botului
 
 symbols:
-  # CONFIG OIL-ONLY (2026-05-26) — STRESS TEST 25.05 confirmat:
-  # BRENT MeanReversion H1 lot 0.08 = +$17/zi (best!)
-  # BRENT Breakout M15 lot 0.08 = +$12/zi
-  # WTI Breakout M15 lot 0.07 = +$8.5/zi
-  # Total estimat: ~$37-45/zi (realist 50-70% = $20-30/zi)
-  # Test durata: 3 saptamani (26.05 - 16.06)
-  - BRENT.cfd        # MeanReversion H1 + Breakout M15, lot 0.08
-  - WTI.cfd          # Breakout M15, lot 0.07
-  # SCOASE 2026-05-26 (post stress test):
-  # - XAUUSD.cfd     # MeanReversion crapa la lot 0.02 (Bug DD)
-  # - XAGUSD.cfd     # Crapa similar la lot mediu
-  # - XPTUSD.cfd     # Dropped pentru simplitate (era +$5/zi extra)
+  # PORTOFOLIU DIVERSIFICAT (2026-07-01) — mass scan 56 simboluri confirmate
+  # OIL bot facea $44/luna. Portofoliu diversificat estimat $600/luna realist.
+  # Test 1 luna cu review la 3 zile in prima saptamana.
+  - XAGUSD.cfd        # Argint — Breakout H1, lot 0.01 (~$290/luna estimat)
+  - XAUUSD.cfd        # Aur — MeanReversion H1, lot 0.01 (~$145/luna)
+  - XPTUSD.cfd        # Platina — MeanReversion M30, lot 0.02 (~$219/luna)
+  - XPDUSD.cfd        # Paladiu — MeanReversion M30, lot 0.02 (~$140/luna)
+  - WTI.cfd           # Petrol US — MeanReversion M30, lot 0.05 (~$142/luna)
+  - BRENT.cfd         # Petrol UK — MeanReversion H1 + Breakout M30, lot 0.05
+  - COCOA.cfd         # Cacao — Breakout H1, lot 0.02 (~$88/luna, WR 70%!)
+  - BNBUSD.cfd        # Binance Coin (crypto) — MeanReversion M30, lot 0.05 (~$109/luna)
 
 active_strategies:
-  - breakout         # M15 pe BRENT + WTI
-  - mean_reversion   # H1 pe BRENT (ACTIVAT NOU 2026-05-26)
-  # - trend_following  # DEZACTIVAT — slab pe oil din stress test
-  # - news_sentiment
-  # - macd_divergence
-  # - scalping
+  - breakout           # M30 default (BRENT), H1 override (XAG, COCOA)
+  - mean_reversion     # H1 default (XAU, BRENT), M30 override (XPT, XPD, WTI, BNB)
 
 execution:
   mode: "python_api"          # "python_api" | "mql5_ea" | "both"

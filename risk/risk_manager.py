@@ -30,6 +30,9 @@ class RiskManager:
         self._daily_trades: int = 0
         self._daily_pnl: float = 0.0
         self._current_date: date = date.today()
+        # NOU 2026-07-01: per-symbol daily loss tracking
+        self._daily_pnl_per_symbol: dict[str, float] = {}
+        self._daily_symbols_disabled: set[str] = set()
 
     def _reset_daily_if_needed(self):
         """Reseteaza contoarele zilnice daca s-a schimbat ziua."""
@@ -37,11 +40,33 @@ class RiskManager:
         if today != self._current_date:
             logger.info(
                 f"Zi noua ({today}) — reset contoare zilnice. "
-                f"PnL ieri: {self._daily_pnl:.2f}, tranzactii: {self._daily_trades}"
+                f"PnL ieri: {self._daily_pnl:.2f}, tranzactii: {self._daily_trades}. "
+                f"PnL per simbol ieri: {self._daily_pnl_per_symbol}"
             )
             self._daily_trades = 0
             self._daily_pnl = 0.0
+            self._daily_pnl_per_symbol = {}
+            self._daily_symbols_disabled = set()
             self._current_date = today
+
+    def is_symbol_disabled_today(self, symbol: str) -> tuple[bool, str]:
+        """Verifica daca un simbol e disabled azi din cauza per-symbol daily loss.
+        Returns: (disabled, reason)
+        """
+        self._reset_daily_if_needed()
+        per_sym_limits = self.limits.get("per_symbol_daily_loss_usd", {}) or {}
+        if symbol not in per_sym_limits:
+            return False, ""
+        current_pnl = self._daily_pnl_per_symbol.get(symbol, 0.0)
+        limit = per_sym_limits[symbol]
+        if current_pnl <= -limit:
+            if symbol not in self._daily_symbols_disabled:
+                logger.warning(
+                    f"[PER-SYMBOL LIMIT] {symbol} disabled azi: PnL {current_pnl:.2f} <= -{limit}"
+                )
+                self._daily_symbols_disabled.add(symbol)
+            return True, f"pierdere zilnica {current_pnl:.2f} depaseste limita -{limit}"
+        return False, ""
 
     def calculate_position_size(
         self, account_balance: float, stop_loss_pips: float, symbol: str
@@ -263,12 +288,22 @@ class RiskManager:
 
         return None
 
-    def record_trade(self, pnl: float):
-        """Inregistreaza o tranzactie inchisa (PnL si contor)."""
+    def record_trade(self, pnl: float, symbol: str = None):
+        """Inregistreaza o tranzactie inchisa (PnL si contor).
+        NOU 2026-07-01: symbol parameter pentru per-symbol daily tracking.
+        """
         self._reset_daily_if_needed()
         self._daily_trades += 1
         self._daily_pnl += pnl
-        logger.info(f"Trade inregistrat: PnL={pnl:.2f} | Zilnic: {self._daily_trades} tranzactii, PnL={self._daily_pnl:.2f}")
+        if symbol:
+            self._daily_pnl_per_symbol[symbol] = self._daily_pnl_per_symbol.get(symbol, 0.0) + pnl
+            logger.info(
+                f"Trade inregistrat: {symbol} PnL={pnl:.2f} | "
+                f"Zilnic: {self._daily_trades} tr, total PnL={self._daily_pnl:.2f}, "
+                f"simbol PnL={self._daily_pnl_per_symbol[symbol]:.2f}"
+            )
+        else:
+            logger.info(f"Trade inregistrat: PnL={pnl:.2f} | Zilnic: {self._daily_trades} tranzactii, PnL={self._daily_pnl:.2f}")
 
     def get_daily_stats(self) -> dict:
         """Returneaza statisticile zilnice."""

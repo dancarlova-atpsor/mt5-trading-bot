@@ -11,13 +11,16 @@ position_sizing:
   max_lot: 0.10             # Max 0.10 lot pe cont 5300 EUR (siguranta)
 
   # Volum fix per simbol (override pe calculul automat)
-  # OIL-ONLY (2026-05-26) — loturi optime din stress test
+  # PORTOFOLIU 2026-07-01 — loturi din mass scan (conservator pentru stress test 180d)
   volume_overrides:
-    BRENT.cfd: 0.08         # MeanRev H1 + Breakout M15, BLOW-UP la 0.09 confirmat
-    WTI.cfd:   0.07         # Breakout M15, BLOW-UP la 0.08 confirmat
-    # Vechi (scoase):
-    # XAUUSD.cfd: 0.02
-    # XAGUSD.cfd: 0.01
+    XAGUSD.cfd: 0.01        # Argint — Breakout H1, redus de la 0.02 (BLOW-UP la 0.02 in stress test)
+    XAUUSD.cfd: 0.01        # Aur — MeanRev H1, redus preventiv
+    XPTUSD.cfd: 0.02        # Platina — MeanRev M30
+    XPDUSD.cfd: 0.02        # Paladiu — MeanRev M30
+    WTI.cfd:    0.05        # Petrol US — MeanRev M30, redus de la 0.07
+    BRENT.cfd:  0.05        # Petrol UK — MeanRev H1 + Breakout M30, redus de la 0.08
+    COCOA.cfd:  0.02        # Cacao — Breakout H1
+    BNBUSD.cfd: 0.05        # Binance Coin (crypto) — MeanRev M30
 
 stop_loss:
   default_pips: 50
@@ -48,12 +51,24 @@ trailing_stop:
   trail_pips: 15
 
 limits:
-  # OIL-ONLY (2026-05-26):
-  # BRENT poate avea 2 pozitii simultan (MeanRev H1 + Breakout M15)
-  # WTI poate avea 1 pozitie (Breakout M15)
-  # Total max activ: 3 (2 BRENT + 1 WTI)
-  max_open_positions: 4           # Buffer +1 (era 3)
-  max_positions_per_symbol: 2     # BRENT poate avea Breakout + MeanRev simultan (era 1)
-  max_daily_loss_percent: 3.0    # 3% (era 2%) — pe oil DD natural mai mare
-  max_daily_trades: 8             # Crescut de la 5 (oil produce mai multe semnale)
-  max_correlation_exposure: 2    # BRENT-WTI sunt corelate, dar trade-uri pe ambele OK
+  # PORTOFOLIU 2026-07-01: 8 simboluri, scalat corespunzator
+  max_open_positions: 8           # 8 simboluri × 1 pozitie fiecare
+  max_positions_per_symbol: 2     # BRENT poate MeanRev H1 + Breakout M30 simultan
+  max_daily_loss_percent: 5.0    # 5% cont ($285 pe $5700) — kill-switch global
+  max_daily_trades: 20            # 8 simboluri × ~2-3 trade/zi mediu
+  max_correlation_exposure: 3    # Metale corelate (XAU/XAG/XPT/XPD), permit 3 simultan
+
+  # NOU 2026-07-01: PER-SIMBOL daily loss limit (izolare per simbol)
+  # Cand un simbol pierde X USD intr-o zi → skip DOAR pe acel simbol, restul continua
+  per_symbol_daily_loss_usd:
+    XAGUSD.cfd: 30              # ~4% cap, blow-up preventiv
+    XAUUSD.cfd: 30
+    XPTUSD.cfd: 30
+    XPDUSD.cfd: 30
+    WTI.cfd:    40
+    BRENT.cfd:  40
+    COCOA.cfd:  25
+    BNBUSD.cfd: 30
+
+  # Kill-switch severe (blow-up prevention)
+  max_dd_kill_switch_usd: 300    # -$300 total DD (5.3% cont) → OPRIRE TOTALA bot

@@ -3,7 +3,7 @@
 > **Fisier critic.** Citeste-l in INTREGIME inainte sa propui modificari.
 > Userul (Dan, SC Luxuria Trans & Travel SRL) opereaza un bot de trading MT5 pe cont demo EarnBroker. Foloseste Romanian / Romglish in conversatii.
 
-Ultima actualizare: **2026-07-01 ora 19:50** (mass scan 60+ simboluri — decizie portofoliu PENDING user).
+Ultima actualizare: **2026-07-01 ora 20:30** (IMPLEMENTAT Optiunea B — portofoliu 8 simboluri cu izolare per simbol).
 
 ---
 
@@ -1292,6 +1292,78 @@ Personal recomand B cu portofoliul de 7-8 simboluri.
 - `backtesting/mass_scan.py` — scan 56 simboluri
 - `results/asymmetry_fix.csv`
 - `results/mass_scan.csv`
+
+### 28.10 IMPLEMENTARE OPTIUNEA B — DEPLOYED 2026-07-01 20:30
+
+**User a ales:** B (izolare per simbol) + toate 8 simboluri + test 1 luna cu check la 3 zile.
+
+**Modificari cod:**
+1. **main.py::load_strategies**: adaugat `symbol_tf_overrides` field
+2. **main.py loop strategii**: TF per simbol (foloseste override daca exista)
+3. **main.py**: apeleaza `is_symbol_disabled_today` inainte de fiecare check
+4. **main.py**: `record_trade` cu symbol parameter (open + close + poll_broker)
+5. **main.py::poll_broker_closes**: primeste `risk_manager` pt feed per-symbol PnL
+6. **risk_manager.py**: `_daily_pnl_per_symbol` dict + `_daily_symbols_disabled` set
+7. **risk_manager.py::is_symbol_disabled_today**: check per-symbol daily loss
+8. **risk_manager.py::record_trade(pnl, symbol=None)**: track per-symbol PnL
+
+**Modificari config:**
+
+`settings.yaml`:
+```yaml
+symbols: [XAGUSD, XAUUSD, XPTUSD, XPDUSD, WTI, BRENT, COCOA, BNBUSD]
+active_strategies: [breakout, mean_reversion]
+```
+
+`strategies.yaml`:
+```yaml
+breakout:
+  timeframe: M30  # default
+  symbols: [BRENT, XAGUSD, COCOA]
+  symbol_tf_overrides: {XAGUSD: H1, COCOA: H1}
+
+mean_reversion:
+  timeframe: H1  # default
+  symbols: [XAUUSD, BRENT, XPTUSD, XPDUSD, WTI, BNBUSD]
+  symbol_tf_overrides: {XPTUSD: M30, XPDUSD: M30, WTI: M30, BNBUSD: M30}
+```
+
+`risk_management.yaml`:
+```yaml
+volume_overrides:
+  XAGUSD: 0.01, XAUUSD: 0.01, XPTUSD: 0.02, XPDUSD: 0.02
+  WTI: 0.05, BRENT: 0.05, COCOA: 0.02, BNBUSD: 0.05
+
+limits:
+  max_open_positions: 8   # crescut de la 4
+  max_daily_loss_percent: 5.0   # crescut de la 3%
+  max_daily_trades: 20   # crescut de la 8
+  per_symbol_daily_loss_usd:  # NOU 2026-07-01
+    XAGUSD: 30, XAUUSD: 30, XPTUSD: 30, XPDUSD: 30
+    WTI: 40, BRENT: 40, COCOA: 25, BNBUSD: 30
+  max_dd_kill_switch_usd: 300  # NOU: kill-switch total DD -$300
+```
+
+**Ce face izolarea per simbol:**
+- Fiecare simbol are propriu buget daily loss ($25-40)
+- Cand un simbol pierde X USD azi → SKIP DOAR pe acel simbol
+- Restul portofoliului continua neafectat
+- Log: `[SYMBOL DISABLED] XAGUSD.cfd: pierdere zilnica -32.50 depaseste limita -30`
+
+**Verificare pre-deploy:**
+- Toate 8 simboluri visible pe broker EarnBroker
+- Spread rezonabil (WTI/BRENT 5-6 puncte, XAU 274 puncte, COCOA 2000 puncte)
+- tick_value verificat pentru PnL correct
+
+**Estimare portofoliu:** ~$600/luna realist = €560/luna = 112% randament anual pe €6,000.
+
+**Test schedule:**
+- Deploy: 01.07 seara
+- Check-in: 04.07, 07.07, 10.07 (primele 3 la 3 zile in prima saptamana)
+- Middle review: 15.07 (2 saptamani)
+- Final review: 01.08 (1 luna)
+
+**Kill-switch:** daca DD total > -$300 (5.3% cont), stop bot + revenim la OIL-only.
 
 ---
 
