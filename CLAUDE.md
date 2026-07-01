@@ -3,7 +3,7 @@
 > **Fisier critic.** Citeste-l in INTREGIME inainte sa propui modificari.
 > Userul (Dan, SC Luxuria Trans & Travel SRL) opereaza un bot de trading MT5 pe cont demo EarnBroker. Foloseste Romanian / Romglish in conversatii.
 
-Ultima actualizare: **2026-07-01 ora 20:30** (IMPLEMENTAT Optiunea B — portofoliu 8 simboluri cu izolare per simbol).
+Ultima actualizare: **2026-07-01 ora 21:30** (DEPLOYAT si RULEAZA — Optiunea B portofoliu 8 simboluri LIVE pe VPS).
 
 ---
 
@@ -1531,6 +1531,76 @@ NEXT STEP cand revine: User alege strategie → implementez cod + config → dep
 **IMPORTANT pentru sesiune noua Claude:**
 Cand revine user, citeste sectiunea 26 INTAI. Decizia OIL-strategy e pending.
 Asteapta user sa aleaga (A vs B) si durata test (1 sapt / 3 sapt / 1 luna), apoi implementeaza.
+
+---
+
+## 29. DEPLOY LIVE OPTIUNEA B — 2026-07-01 21:30 RO
+
+### 29.1 Deploy prin computer-use (RDP tunnel)
+User nu putea face copy-paste in RDP (clipboard sync broken).
+Am folosit computer-use MCP pentru a controla direct laptopul → RDP → VPS PowerShell.
+Metoda: type character-by-character in chunks de ~5 chars (chunks mai mari triggered clipboard fallback care esua prin RDP).
+
+Pasii executati:
+1. Chrome deschis pe VPS via RDP
+2. Navigat la github.com/dancarlova-atpsor/mt5-trading-bot/raw/main/deploy.ps1
+3. Save via Ctrl+S (dar Chrome a salvat ca `.txt` invizibil - problema encoding)
+4. Deschis PowerShell prin address bar Explorer VPS ("powershell" in address bar)
+5. Set-ExecutionPolicy Bypass -Scope Process -Force
+6. Skip deploy.ps1 corrupt, folosit iwr direct pentru zip
+7. Expand-Archive + robocopy pentru copiere cod
+8. `.\.venv\Scripts\python.exe main.py` — start bot
+
+### 29.2 Confirmare bot ruleaza cu 8 simboluri
+Log confirmare:
+```
+21:30:19 Trading Bot MT5 — Start
+21:30:19 MT5 conectat cont 9047479, balance $98,091.74
+21:30:19 Strategie incarcata: breakout | ['BRENT.cfd', 'XAGUSD.cfd', 'COCOA.cfd']
+         TF default: M30 | Overrides: {'XAGUSD.cfd': 'H1', 'COCOA.cfd': 'H1'}
+21:30:19 Strategie incarcata: mean_reversion | ['XAUUSD', 'BRENT', 'XPTUSD', 'XPDUSD', 'WTI', 'BNBUSD']
+         TF default: H1 | Overrides: {'XPTUSD': 'M30', 'XPDUSD': 'M30', 'WTI': 'M30', 'BNBUSD': 'M30'}
+21:30:19 SuperBot INITIALIZED | 8 simboluri
+21:30:21 DeepAnalyzer: 8/8 simboluri active
+```
+
+Regime detection initial:
+- XAGUSD, XAUUSD, XPTUSD, WTI, BRENT: TRENDING (size_mult 1.30)
+- XPDUSD, BNBUSD: QUIET (size_mult 0.50)
+- COCOA: RANGING (size_mult 0.70)
+
+### 29.3 Calendar test 1 luna
+- Start: 01.07.2026 21:30
+- Check-in-uri primele 3 zile: 04.07, 07.07, 10.07
+- Middle review: 15.07 (2 saptamani)
+- Final review: 01.08 (1 luna)
+
+### 29.4 Estimare
+- Realista: $600/luna (€560/luna) = 112% randament anual pe €6,000
+- Pesimist 25%: $300/luna
+- vs Depozit banca 3%: €180/an
+
+### 29.5 Kill-switch
+- Per-symbol daily loss: $25-40 → skip DOAR simbolul respectiv
+- Global daily loss: 5% ($285) → stop bot pentru ziua respectiva
+- max_dd_kill_switch_usd: 300 → OPRIRE TOTALA + revert la OIL-only
+
+### 29.6 Lectii tehnice invatate
+1. **RDP clipboard broken** — poate blocheaza deploy standard. Solutii:
+   - Fix RDP client: mstsc → Show Options → Local Resources → More → Clipboard ✓
+   - Sau computer-use MCP pentru control direct
+   - Sau type in chunks < 12 chars (mai mari triggers clipboard fallback)
+2. **Chrome save.ps1 → devine .ps1.txt** — Windows hide extension. Rename cu `ren`.
+3. **Chrome save encoding** — PowerShell parse fails la Get-Item length/1KB. Solutie: download direct iwr.
+4. **VPS taskbar hidden** — Chrome maximized in RDP acopera VPS taskbar. Solutie: navighez prin address bar Explorer, sau click in interior RDP.
+5. **PowerShell address bar Explorer** — Type "powershell" in address bar → deschide PS in current folder. Trick genial.
+
+### 29.7 Commits sesiune
+- `f6f552a` — Optiunea B config + cod
+- `4cb562e` — deploy.ps1 script
+- `bbb68eb` — mass scan + docs
+
+Bot ruleaza pe VPS din `f6f552a`. Repo GitHub va reveni la private dupa deploy.
 
 ---
 
