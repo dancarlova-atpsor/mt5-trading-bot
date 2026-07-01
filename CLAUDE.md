@@ -3,7 +3,7 @@
 > **Fisier critic.** Citeste-l in INTREGIME inainte sa propui modificari.
 > Userul (Dan, SC Luxuria Trans & Travel SRL) opereaza un bot de trading MT5 pe cont demo EarnBroker. Foloseste Romanian / Romglish in conversatii.
 
-Ultima actualizare: **2026-06-02 ora 19:20** (FIX SuperBot QUIET filter blocaj — 6 zile 0 trade-uri pe oil rezolvat).
+Ultima actualizare: **2026-07-01 ora 19:50** (mass scan 60+ simboluri — decizie portofoliu PENDING user).
 
 ---
 
@@ -1173,6 +1173,125 @@ skip_quiet: false    # era true
 - Risc: lot mai mic pe QUIET = profit mai mic per trade, dar **macar exista trade-uri**
 
 **TODO viitor:** simulare SuperBot in backtest pentru estimari live realiste.
+
+---
+
+## 28. SESIUNE 2026-07-01 — MASS SCAN + PORTOFOLIU DIVERSIFICAT (PENDING)
+
+### 28.1 Review live 4 saptamani (03.06 → 01.07)
+Bot OIL a facut in 4 saptamani:
+- 34 trade-uri, WR 73.5% (dar asimetric)
+- NET **+$44** (~$1.5/zi, sub target)
+- **Problema:** avg win $13, avg loss $31 (loss 2.4× mai mare!)
+- Prima jumatate (03-17.06): +$172 excelent
+- A doua jumatate (18.06-01.07): -$128 dezastru (pierderi -$63, -$33, -$32×4)
+
+### 28.2 User frustrat: "banii trebuie sa faca bani"
+- NU vrea depozit banca (€180/an insuficient)
+- Vrea castiguri mari + pierderi mici (invers de acum)
+- User a intrebat: mai multe conturi demo, perechi diferite pe fiecare
+
+### 28.3 BACKTEST asymmetry fix (test_asymmetry_fix.py) — CONCLUZIE
+
+Am testat 4 configuratii cu cele 4 modificari propuse:
+- CURRENT (actual live): NET +$103 / 90 zile
+- CAP_LOT (lot max 0.05): NET -$876 (rau!)
+- LET_RUN (trailing +$88 + BE stop): NET -$1485 (WR crash 63%→21%!)
+- TIGHT_SL (toate 4 fix-uri): NET -$1037
+
+**REVELATIE:** Config CURRENT e OPTIM. Trailing +$44 taie winners MICI dar frecventi.
+Cand ridici la +$88, WR se prabuseste (winners nu ajung acolo, se intorc pe SL).
+**Asimetria e BY DESIGN — bot castiga prin volum (WR 63%), nu prin dimensiune.**
+
+Nu putem obtine mai mult din OIL M30+H1. Backtest 90d = $34/luna, live 4sapt = $44/luna. Consistent.
+
+### 28.4 MASS SCAN — 56 simboluri × 2 strategii × 2 TF = 224 backtests
+
+Testate:
+- 25 Forex (majors + JPY crosses + exotic)
+- 6 Metale (XAU/XAG/XPT/XPD × USD/EUR)
+- 5 Commodities (WTI, BRENT, COCOA, COFFEE, SUGAR)
+- 2 Indices (NIKKEI, US2000)
+- 18 Crypto
+
+CSV: `results/mass_scan.csv`
+
+**TOP 15 profitabile 90 zile (excluzand crypto cu lot inflate DOG/XRP):**
+
+| # | Simbol | Strategy | TF | Lot | $/luna |
+|---|---|---|---|---:|---:|
+| 3 | **XAGUSD** | Breakout | H1 | 0.02 | **+$584** 🏆 |
+| 6 | XAUUSD | MeanRev | H1 | 0.02 | +$293 |
+| 8 | XAGUSD | Breakout | M30 | 0.02 | +$252 |
+| 9 | XPTUSD | MeanRev | M30 | 0.02 | +$219 |
+| 10 | XAUEUR | MeanRev | M30 | 0.02 | +$172 |
+| 11 | XAUUSD | MeanRev | M30 | 0.02 | +$157 |
+| 12 | WTI | MeanRev | M30 | 0.05 | +$142 |
+| 13 | XPDUSD | MeanRev | M30 | 0.02 | +$140 |
+| 15 | XMRUSD | MeanRev | H1 | 0.05 | +$110 |
+| 16 | BNBUSD | MeanRev | M30 | 0.05 | +$109 |
+| 17 | **COCOA** | Breakout | H1 | 0.02 | +$88 (WR 70%!) |
+| 23 | BRENT | MeanRev | H1 | 0.05 | +$67 |
+
+**⚠️ ATENTIE — discrepanta cu stress test:**
+- Stress test 180 zile: XAU/XAG MeanRev au avut BLOW-UPS la lot 0.02
+- Mass scan 90 zile: aceleasi apar profitabile (recent perioada favorabila)
+- **Riscul blow-up ramane real** — folosim loturi mici (0.01-0.02)
+
+### 28.5 PORTOFOLIU DIVERSIFICAT propus (PENDING decizie user)
+
+| Simbol | Strategy | TF | Lot | $/luna estimat |
+|---|---|---|---:|---:|
+| XAGUSD | Breakout | H1 | **0.01** (nu 0.02) | ~$290 |
+| XAUUSD | MeanRev | H1 | **0.01** | ~$145 |
+| XPTUSD | MeanRev | M30 | 0.02 | $219 |
+| XPDUSD | MeanRev | M30 | 0.02 | $140 |
+| WTI | MeanRev | M30 | 0.05 | $142 |
+| BRENT | MeanRev | H1 | 0.05 | $67 |
+| COCOA | Breakout | H1 | 0.02 | $88 |
+| BNBUSD | MeanRev | M30 | 0.05 | $109 |
+| **TOTAL brut** | | | | **~$1,200/luna** |
+| **Realistic 50%** | | | | **~$600/luna = €560/luna** |
+
+**€560/luna pe €6,000 = 112% randament anual** (vs banca 3% = 37× mai bun).
+
+### 28.6 3 OPTIUNI implementare (user alege cand ajunge acasa)
+
+**A) UN bot cu multe simboluri (SIMPLU)**
+- Zero cod nou, adaug simboluri in settings.yaml
+- Contra: toate impart max_open_positions: 4, un simbol prost blocheaza restul
+- Deploy: 10 min
+
+**B) UN bot cu SUB-CONFIG per simbol (RECOMANDAT)**
+- Adaug per-symbol daily loss limits + max positions
+- Necesita cod ~2h (modificare risk_manager + main.py)
+- Contra: mai complex
+- Pro: izolare per simbol, un blow-up nu ucide restul portofoliului
+
+**C) MULTIPLE conturi demo (COMPLEX)**
+- 3-4 conturi separate, fiecare cu 2 simboluri
+- Necesita: multiple MT5 terminals + multiple bot instances + VPS upgrade
+- VPS-ul actual (2GB RAM) probabil NU tine 4 bot-uri + 4 MT5-uri
+- **NU recomand** — complexitate vs beneficiu prost
+
+### 28.7 CRYPTO — atentie lot-uri gresite in backtest
+Setari default in mass_scan pentru crypto au fost TOO BIG:
+- DOGUSD lot 100 → +$58,000/luna (irelevant)
+- XRPUSD lot 5 → +$647/luna (probabil inflate)
+- ADAUSD lot 5 → +$500/luna (inflate)
+
+**BNBUSD lot 0.05** e realistic → $109/luna probabil corect.
+Crypto realistice ar produce **10-20% din valorile din backtest**.
+
+### 28.8 DECIZIE USER cand ajunge acasa
+Alege A/B/C + ce simboluri concrete din tabel.
+Personal recomand B cu portofoliul de 7-8 simboluri.
+
+### 28.9 Fisiere create sesiune 01.07
+- `backtesting/test_asymmetry_fix.py` — validare ca CURRENT config e optim
+- `backtesting/mass_scan.py` — scan 56 simboluri
+- `results/asymmetry_fix.csv`
+- `results/mass_scan.csv`
 
 ---
 
