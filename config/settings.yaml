@@ -20,7 +20,9 @@ symbols:
   - WTI.cfd           # Petrol US — MeanReversion M30, lot 0.05 (~$142/luna)
   - BRENT.cfd         # Petrol UK — MeanReversion H1 + Breakout M30, lot 0.05
   - COCOA.cfd         # Cacao — Breakout H1, lot 0.02 (~$88/luna, WR 70%!)
-  - BNBUSD.cfd        # Binance Coin (crypto) — MeanReversion M30, lot 0.05 (~$109/luna)
+  # BNBUSD.cfd SCOS 2026-07-06 — 4 loss-uri consecutive, -$163 in 24h (75% din pierderea saptamanii).
+  # Per-symbol daily loss ($30) NU a prevenit al 3-lea trade — tinut peste weekend (crypto 24/7) → -$122.
+  # Cauze: weekend hold + lot 0.07 (calibrator TRENDING 1.3x). Revizuire dupa fix intraday close crypto.
 
 active_strategies:
   - breakout           # M30 default (BRENT), H1 override (XAG, COCOA)

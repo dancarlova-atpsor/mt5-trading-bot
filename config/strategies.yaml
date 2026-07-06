@@ -65,12 +65,11 @@ mean_reversion:
     - XPTUSD.cfd     # M30 (override) — 0.02 lot, ~$219/luna
     - XPDUSD.cfd     # M30 (override) — 0.02 lot, ~$140/luna
     - WTI.cfd        # M30 (override) — 0.05 lot, ~$142/luna
-    - BNBUSD.cfd     # M30 (override) — 0.05 lot, ~$109/luna
+    # BNBUSD.cfd SCOS 2026-07-06 — -$163 in 24h (weekend hold + calibrator lot 0.07)
   symbol_tf_overrides:
     XPTUSD.cfd: "M30"
     XPDUSD.cfd: "M30"
     WTI.cfd: "M30"
-    BNBUSD.cfd: "M30"
   rsi_period: 14
   rsi_oversold: 30
   rsi_overbought: 70
