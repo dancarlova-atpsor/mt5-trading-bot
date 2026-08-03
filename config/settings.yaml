@@ -10,23 +10,26 @@ account:
   magic_number: 123456      # ID unic pentru ordinele botului
 
 symbols:
-  # PORTOFOLIU DIVERSIFICAT (2026-07-01) — mass scan 56 simboluri confirmate
-  # OIL bot facea $44/luna. Portofoliu diversificat estimat $600/luna realist.
-  # Test 1 luna cu review la 3 zile in prima saptamana.
-  - XAGUSD.cfd        # Argint — Breakout H1, lot 0.01 (~$290/luna estimat)
-  - XAUUSD.cfd        # Aur — MeanReversion H1, lot 0.01 (~$145/luna)
-  - XPTUSD.cfd        # Platina — MeanReversion M30, lot 0.02 (~$219/luna)
-  - XPDUSD.cfd        # Paladiu — MeanReversion M30, lot 0.02 (~$140/luna)
-  - WTI.cfd           # Petrol US — MeanReversion M30, lot 0.05 (~$142/luna)
-  - BRENT.cfd         # Petrol UK — MeanReversion H1 + Breakout M30, lot 0.05
-  - COCOA.cfd         # Cacao — Breakout H1, lot 0.02 (~$88/luna, WR 70%!)
-  # BNBUSD.cfd SCOS 2026-07-06 — 4 loss-uri consecutive, -$163 in 24h (75% din pierderea saptamanii).
-  # Per-symbol daily loss ($30) NU a prevenit al 3-lea trade — tinut peste weekend (crypto 24/7) → -$122.
-  # Cauze: weekend hold + lot 0.07 (calibrator TRENDING 1.3x). Revizuire dupa fix intraday close crypto.
+  # PORTOFOLIU 2026-08-03 — refactor ZONE-BASED H4 (7 simboluri)
+  # Analiza chart D1+H4 arata 2 categorii macro:
+  #   A) METALE post-crash BASING (XAG/XAU/XPT/XPD) → ping-pong intre suport/rezistenta
+  #   B) OIL + COCOA recovery TREND pullback → buy dips / fade rally
+  # Vezi config/strategies.yaml → zone_based.zones pentru zone hardcoded per simbol
+  #
+  # BNBUSD SCOS PERMANENT — crypto 24/7 + weekend hold = risc necontrolat
+  # -$163 in 24h pe 03.07 (75% din pierderea totala saptamana), reintroducere doar
+  # dupa fix intraday close + cap lot manual.
+  - XAGUSD.cfd        # Argint (basing 55-62)
+  - XAUUSD.cfd        # Aur (basing 3900-4200)
+  - XPTUSD.cfd        # Platina (basing 1540-1720)
+  - XPDUSD.cfd        # Paladiu (basing 1150-1340)
+  - WTI.cfd           # Petrol US (pullback 78 din rally 92)
+  - BRENT.cfd         # Petrol UK (pullback 83 din rally 95)
+  - COCOA.cfd         # Cacao (pullback 5700 din rally 6400)
 
 active_strategies:
-  - breakout           # M30 default (BRENT), H1 override (XAG, COCOA)
-  - mean_reversion     # H1 default (XAU, BRENT), M30 override (XPT, XPD, WTI, BNB)
+  - zone_based       # NOU 2026-08-03 — H4 zone-based ping-pong + trend pullback
+  # breakout, mean_reversion DEZACTIVATE (vezi strategies.yaml)
 
 execution:
   mode: "python_api"          # "python_api" | "mql5_ea" | "both"
@@ -48,6 +51,14 @@ notifications:
     notify_errors: true       # Alerte erori si stop
 
 position_cooldown_seconds: 300    # 5 min cooldown pe simbol dupa close (evita re-entry rapid)
+
+# NOU 2026-08-03: Break-Even stop
+# Cand profit unrealized >= sl_distance USD * trigger_multiplier → muta SL la entry
+# Transforma pierderile potentiale in breakeven daca pretul revine
+break_even_stop:
+  enabled: true
+  trigger_multiplier: 1.0    # profit trebuie >= 1× SL distance USD ca sa mut SL la BE
+  offset_pips: 0             # 0 = SL exact la entry. >0 = lock small profit (entry + offset)
 
 profit_manager:
   trailing_activation_eur: 40     # Activare trailing la +40 EUR (era 30)

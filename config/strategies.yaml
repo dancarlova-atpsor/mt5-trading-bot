@@ -1,9 +1,144 @@
-# ============================================
-# Parametri per Strategie — TOP 5 ales dupa grid search
-# ============================================
+# ═══════════════════════════════════════════════════════════════════════
+# Parametri per Strategie
+# Refactor 2026-08-03: zone_based ACTIV pentru 7 simboluri
+# Vechile strategii (breakout, mean_reversion) DEZACTIVATE pentru portofoliul curent
+# ═══════════════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════════════
+# STRATEGIA PRINCIPALA — ZONE BASED (2026-08-03)
+# Zone tehnice hardcoded per simbol pe baza analiza chart D1+H4
+# 4 metale post-crash BASING (XAG/XAU/XPT/XPD) + 3 recovery TREND (BRENT/WTI/COCOA)
+# ═══════════════════════════════════════════════════════════════════════
+
+zone_based:
+  enabled: true
+  timeframe: "H4"    # H4 pentru toate — filtreaza noise-ul H1/M30
+  rsi_period: 14
+  symbols:
+    - XAGUSD.cfd
+    - XAUUSD.cfd
+    - XPTUSD.cfd
+    - XPDUSD.cfd
+    - BRENT.cfd
+    - WTI.cfd
+    - COCOA.cfd
+
+  # ─────────────────────────────────────────────────────────────────
+  # ZONE per simbol (analiza chart 2026-08-03)
+  # ─────────────────────────────────────────────────────────────────
+  zones:
+
+    # ═══ CATEGORIE A: METALE post-crash BASING ═══
+
+    XAGUSD.cfd:
+      # Argint — Range 55-62 dupa crash mai (-37%)
+      buy_zone: [54.50, 55.50]
+      sell_zone: [60.00, 62.00]
+      dead_zone: [56.50, 59.50]
+      rsi_buy_max: 40
+      rsi_sell_min: 60
+      breakout_up: 62.50
+      breakout_down: 53.50
+      buy_sl: 53.80
+      sell_sl: 62.80
+      buy_tp: 58.00
+      sell_tp: 58.00
+
+    XAUUSD.cfd:
+      # Aur — Range 3900-4200 dupa crash feb-iun (-29%)
+      buy_zone: [3990, 4020]
+      sell_zone: [4110, 4150]
+      dead_zone: [4030, 4100]
+      rsi_buy_max: 40
+      rsi_sell_min: 60
+      breakout_up: 4210
+      breakout_down: 3890
+      buy_sl: 3970
+      sell_sl: 4165
+      buy_tp: 4055
+      sell_tp: 4055
+
+    XPTUSD.cfd:
+      # Platina — Range 1540-1720 dupa crash apr-iun (-26%)
+      buy_zone: [1560, 1600]
+      sell_zone: [1680, 1710]
+      dead_zone: [1610, 1675]
+      rsi_buy_max: 40
+      rsi_sell_min: 60
+      breakout_up: 1725
+      breakout_down: 1530
+      buy_sl: 1540
+      sell_sl: 1730
+      buy_tp: 1640
+      sell_tp: 1640
+
+    XPDUSD.cfd:
+      # Paladiu — Range 1150-1340 dupa crash apr-iun (-28%)
+      buy_zone: [1180, 1220]
+      sell_zone: [1300, 1330]
+      dead_zone: [1240, 1290]
+      rsi_buy_max: 40
+      rsi_sell_min: 60
+      breakout_up: 1345
+      breakout_down: 1145
+      buy_sl: 1150
+      sell_sl: 1350
+      buy_tp: 1265
+      sell_tp: 1265
+
+    # ═══ CATEGORIE B: OIL + COCOA recovery TREND ═══
+
+    BRENT.cfd:
+      # Petrol UK — Fund 67 (iun) → rally 95 (24 iul) → pullback 83
+      buy_zone: [80.00, 82.00]
+      sell_zone: [88.00, 92.00]
+      dead_zone: [82.50, 87.50]
+      rsi_buy_max: 40
+      rsi_sell_min: 60
+      breakout_up: 95.50
+      breakout_down: 79.00
+      buy_sl: 78.50
+      sell_sl: 92.50
+      buy_tp: 88.00
+      sell_tp: 82.00
+
+    WTI.cfd:
+      # Petrol US — Fund 68 (iun) → rally 92 (21 iul) → pullback 78
+      buy_zone: [72.00, 74.00]
+      sell_zone: [85.00, 88.00]
+      dead_zone: [75.00, 84.00]
+      rsi_buy_max: 40
+      rsi_sell_min: 60
+      breakout_up: 92.50
+      breakout_down: 71.50
+      buy_sl: 70.00
+      sell_sl: 89.50
+      buy_tp: 80.00
+      sell_tp: 78.00
+
+    COCOA.cfd:
+      # Cacao — Rally masiv (+68%) → pullback 6400 → 5400
+      buy_zone: [5100, 5300]
+      sell_zone: [6100, 6300]
+      dead_zone: [5400, 6000]
+      rsi_buy_max: 40
+      rsi_sell_min: 60
+      breakout_up: 6400
+      breakout_down: 5000
+      buy_sl: 4950
+      sell_sl: 6420
+      buy_tp: 5700
+      sell_tp: 5700
+
+# ═══════════════════════════════════════════════════════════════════════
+# STRATEGII VECHI — DEZACTIVATE 2026-08-03
+# Motivul: framework MeanRev H1 + Breakout H1 = whipsaw factory
+# Analiza chart 03.08 arata cascade -$163 BNBUSD + net -$660 in 33 zile
+# Pastrate ca fallback / referinta (nu sunt sterse din cod)
+# ═══════════════════════════════════════════════════════════════════════
 
 trend_following:
-  enabled: false   # DEZACTIVAT 2026-05-26 — stress test arata TF slab pe oil
+  enabled: false
   timeframe: "H1"
   symbols: []
   ema_fast: 20
@@ -15,61 +150,39 @@ trend_following:
   adx_period: 14
 
 breakout:
-  enabled: true
-  timeframe: "M30"    # Default TF pentru simbolurile fara override
-  # PORTOFOLIU 2026-07-01: BRENT M30 + XAG H1 + COCOA H1
-  # symbol_tf_overrides permite TF diferit per simbol (NOU 2026-07-01)
-  symbols:
-    - BRENT.cfd      # M30 (default) — 0.05 lot
-    - XAGUSD.cfd     # H1 (override) — 0.01 lot, +$584/luna estimat
-    - COCOA.cfd      # H1 (override) — 0.02 lot, WR 70%!
-  symbol_tf_overrides:
-    XAGUSD.cfd: "H1"
-    COCOA.cfd: "H1"
+  enabled: false   # DEZACTIVAT 2026-08-03 — inlocuit cu zone_based
+  timeframe: "M30"
+  symbols: []
+  symbol_tf_overrides: {}
   lookback_period: 50
   atr_period: 14
   min_atr_ratio: 0.8
   min_vol_ratio: 1.5
 
 macd_divergence:
-  enabled: false             # Dezactivat 2026-04-17: backtest arata 0-1 trade pe simbol, pierdere
+  enabled: false
   timeframe: "H1"
-  symbols:
-    - EURUSD.cfd
-    - AUDUSD.cfd
-    - GBPUSD.cfd
-    - EURGBP.cfd
+  symbols: []
   macd_fast: 12
   macd_slow: 26
   macd_signal: 9
   rsi_period: 14
-  rsi_oversold: 35           # RELAXAT (era 40)
-  rsi_overbought: 65         # RELAXAT (era 60)
-  divergence_lookback: 25    # RELAXAT (era 30) — divergente mai recente
+  rsi_oversold: 35
+  rsi_overbought: 65
+  divergence_lookback: 25
 
 news_sentiment:
-  enabled: false             # Dezactivat 2026-04-17: sentiment a dus la pierderi overnight
+  enabled: false
   timeframe: "H1"
-  symbols:
-    - EURUSD.cfd
+  symbols: []
   min_articles: 3
   min_score: 0.3
 
 mean_reversion:
-  enabled: true
-  timeframe: "H1"     # Default TF pentru simbolurile fara override
-  # PORTOFOLIU 2026-07-01: XAU H1 + BRENT H1 + XPT/XPD/WTI/BNB M30
-  symbols:
-    - XAUUSD.cfd     # H1 (default) — 0.01 lot, ~$145/luna
-    - BRENT.cfd      # H1 (default) — 0.05 lot
-    - XPTUSD.cfd     # M30 (override) — 0.02 lot, ~$219/luna
-    - XPDUSD.cfd     # M30 (override) — 0.02 lot, ~$140/luna
-    - WTI.cfd        # M30 (override) — 0.05 lot, ~$142/luna
-    # BNBUSD.cfd SCOS 2026-07-06 — -$163 in 24h (weekend hold + calibrator lot 0.07)
-  symbol_tf_overrides:
-    XPTUSD.cfd: "M30"
-    XPDUSD.cfd: "M30"
-    WTI.cfd: "M30"
+  enabled: false   # DEZACTIVAT 2026-08-03 — inlocuit cu zone_based
+  timeframe: "H1"
+  symbols: []
+  symbol_tf_overrides: {}
   rsi_period: 14
   rsi_oversold: 30
   rsi_overbought: 70

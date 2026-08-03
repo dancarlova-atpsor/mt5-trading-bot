@@ -23,6 +23,7 @@ from strategies.scalping import Scalping
 from strategies.news_strategy import NewsSentiment
 from strategies.breakout import Breakout
 from strategies.macd_divergence import MACDDivergence
+from strategies.zone_based import ZoneBasedStrategy
 from utils.logger import setup_logger
 from utils.helpers import load_config, is_trading_hours, pips_to_price
 from utils.notifier import TelegramNotifier
@@ -51,6 +52,7 @@ def load_strategies(strategies_config: dict, active_list: list) -> list[dict]:
         "news_sentiment": NewsSentiment,
         "breakout": Breakout,
         "macd_divergence": MACDDivergence,
+        "zone_based": ZoneBasedStrategy,
     }
 
     loaded = []
@@ -89,14 +91,22 @@ def load_strategies(strategies_config: dict, active_list: list) -> list[dict]:
 
 
 def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts: float, symbol_last_close_time: dict = None, risk_manager=None) -> float:
-    """Polls broker's deals history si feed-uieste pozitiile inchise noi in SuperBot.
+    """Polls broker's deals history si feed-uieste pozitiile inchise noi.
 
     Detecteaza TOATE inchiderile (SL, TP, manual, trailing) — nu doar cele initiate de cod.
-    Necesar pentru auto-disable: altfel SL-hits sunt invizibile pt performance_tracker.
+    Feed:
+      - SuperBot (daca activ) — pentru performance_tracker
+      - RiskManager (daca dat) — pentru per-symbol daily loss tracking
+
+    FIX 2026-08-03: nu mai iese devreme daca superbot None/disabled — feed risk_manager oricum.
+    Anterior: BNBUSD 03.07 a facut cascade -$163 pentru ca risk_manager nu primea PnL cand
+    poll-ul iesea devreme (dar superbot era ok atunci — bug edge case pentru viitor).
 
     Returns: noul timestamp pentru urmatorul poll (now).
     """
-    if superbot is None or not superbot.enabled:
+    # Daca NICI superbot NICI risk_manager nu sunt disponibili → nimic de facut
+    superbot_active = superbot is not None and getattr(superbot, "enabled", False)
+    if not superbot_active and risk_manager is None:
         return time.time()
 
     now = time.time()
@@ -149,28 +159,39 @@ def poll_broker_closes(superbot, known_closed_tickets: set, magic: int, from_ts:
             opened_at = float(in_deal.time) if in_deal else float(out_deal.time)
             closed_at = float(out_deal.time)
 
-            try:
-                superbot.on_trade_closed(
-                    symbol=symbol, strategy=strategy, pnl=pnl,
-                    opened_at=opened_at, closed_at=closed_at,
-                )
+            # Feed SuperBot (daca activ)
+            if superbot_active:
+                try:
+                    superbot.on_trade_closed(
+                        symbol=symbol, strategy=strategy, pnl=pnl,
+                        opened_at=opened_at, closed_at=closed_at,
+                    )
+                    close_kind = "SL/TP" if pnl < 0 or "[" in (out_deal.comment or "") else "close"
+                    logger.info(
+                        f"[SuperBot] Broker {close_kind}: #{out_deal.ticket} {symbol} "
+                        f"[{strategy}] PnL={pnl:+.2f}"
+                    )
+                except Exception as e:
+                    logger.error(f"on_trade_closed feed error: {e}")
+            else:
+                # Log ca sa avem vizibilitate chiar si fara SuperBot
                 close_kind = "SL/TP" if pnl < 0 or "[" in (out_deal.comment or "") else "close"
                 logger.info(
-                    f"[SuperBot] Broker {close_kind}: #{out_deal.ticket} {symbol} "
+                    f"[Broker close] {close_kind}: #{out_deal.ticket} {symbol} "
                     f"[{strategy}] PnL={pnl:+.2f}"
                 )
-                if symbol_last_close_time is not None:
-                    # Bug fix 2026-05-11: foloseste time.time() local NU broker time
-                    # (broker time poate fi in alt timezone — cooldown failed pe INTC)
-                    symbol_last_close_time[symbol] = time.time()
-                # NOU 2026-07-01: feed per-symbol PnL to risk_manager pt daily loss limit
-                if risk_manager is not None:
-                    try:
-                        risk_manager.record_trade(pnl, symbol=symbol)
-                    except Exception as e:
-                        logger.error(f"risk_manager.record_trade feed error: {e}")
-            except Exception as e:
-                logger.error(f"on_trade_closed feed error: {e}")
+
+            # Cooldown per-simbol (bug fix 2026-05-11: time.time() local)
+            if symbol_last_close_time is not None:
+                symbol_last_close_time[symbol] = time.time()
+
+            # NOU 2026-07-01: feed per-symbol PnL la risk_manager (independent de SuperBot)
+            # FIX 2026-08-03: mutat AFARA din try SuperBot — ruleaza chiar daca superbot None
+            if risk_manager is not None:
+                try:
+                    risk_manager.record_trade(pnl, symbol=symbol)
+                except Exception as e:
+                    logger.error(f"risk_manager.record_trade feed error: {e}")
 
     except Exception as e:
         logger.error(f"poll_broker_closes error: {e}")
@@ -365,6 +386,15 @@ def main():
     symbol_last_close_time: dict[str, float] = {}
     position_cooldown = settings.get("position_cooldown_seconds", 300)
 
+    # NOU 2026-08-03: Break-Even stop tracking
+    # Cand profit unrealized ajunge la sl_distance USD, mutam SL la entry
+    # (transforma loss potentiala in breakeven daca pretul revine)
+    be_moved_tickets: set[int] = set()
+    be_config = settings.get("break_even_stop", {})
+    be_enabled = be_config.get("enabled", True)
+    be_trigger_multiplier = be_config.get("trigger_multiplier", 1.0)  # profit >= sl_dist * mult → move to BE
+    be_offset_pips = be_config.get("offset_pips", 0)  # optional: mut SL la entry+offset (lock small profit)
+
     try:
         while running:
             try:
@@ -433,15 +463,18 @@ def main():
                 # SuperBot tick — cere deep analysis la fiecare N iteratii
                 if superbot is not None:
                     superbot.tick()
-                    # Poll broker pt inchideri noi (SL/TP) — feed in performance_tracker
-                    superbot_last_poll_ts = poll_broker_closes(
-                        superbot,
-                        superbot_known_closed_tickets,
-                        superbot_magic,
-                        superbot_last_poll_ts,
-                        symbol_last_close_time=symbol_last_close_time,
-                        risk_manager=risk_manager,
-                    )
+
+                # Poll broker pt inchideri noi (SL/TP) — feed in performance_tracker + risk_manager
+                # FIX 2026-08-03: mutat AFARA din if superbot — ruleaza intotdeauna pentru risk_manager
+                # (anterior BNBUSD 03.07 cascade -$163 pt ca updates per-symbol daily loss se pierdeau)
+                superbot_last_poll_ts = poll_broker_closes(
+                    superbot,
+                    superbot_known_closed_tickets,
+                    superbot_magic,
+                    superbot_last_poll_ts,
+                    symbol_last_close_time=symbol_last_close_time,
+                    risk_manager=risk_manager,
+                )
 
                 # ============================================
                 # PROFIT MANAGER — verificari inainte de orice
@@ -470,6 +503,66 @@ def main():
 
                 # Pozitii deschise
                 open_positions = order_manager.get_open_positions()
+
+                # ============================================
+                # BREAK-EVEN STOP (NOU 2026-08-03)
+                # Cand profit unrealized >= sl_distance USD → mut SL la entry
+                # (transforma pierderi potentiale in breakeven daca pretul revine)
+                # ============================================
+                if be_enabled and open_positions:
+                    for pos in open_positions:
+                        ticket = pos["ticket"]
+                        if ticket in be_moved_tickets:
+                            continue  # Deja mutat la BE
+
+                        entry = pos.get("open_price", 0)
+                        current_sl = pos.get("sl", 0)
+                        symbol = pos["symbol"]
+                        if entry == 0 or current_sl == 0:
+                            continue
+
+                        # Distanta SL in pret (SL vs entry)
+                        sl_distance_price = abs(entry - current_sl)
+                        if sl_distance_price == 0:
+                            continue
+
+                        # Calculam sl_distance in USD folosind tick_value
+                        sym_info_be = mt5.symbol_info(symbol)
+                        if sym_info_be is None or sym_info_be.trade_tick_size == 0:
+                            continue
+                        sl_distance_ticks = sl_distance_price / sym_info_be.trade_tick_size
+                        sl_distance_usd = sl_distance_ticks * sym_info_be.trade_tick_value * pos["volume"]
+
+                        # BE trigger: profit >= sl_distance_usd * multiplier
+                        trigger_usd = sl_distance_usd * be_trigger_multiplier
+                        if pos["profit"] >= trigger_usd and trigger_usd > 0:
+                            # Muta SL la entry (+ optional offset)
+                            offset_price = pips_to_price(symbol, be_offset_pips) if be_offset_pips else 0
+                            if pos["type"] == "BUY":
+                                new_sl = entry + offset_price
+                                # Doar daca imbunatatim SL-ul (nu inrautatim)
+                                if new_sl > current_sl:
+                                    result = order_manager.modify_position(ticket, sl=new_sl)
+                                    if result.success:
+                                        be_moved_tickets.add(ticket)
+                                        logger.info(
+                                            f"[BE STOP] #{ticket} {symbol} BUY: profit +{pos['profit']:.2f} >= "
+                                            f"trigger +{trigger_usd:.2f} → SL {current_sl} → {new_sl:.5f} (breakeven)"
+                                        )
+                            else:  # SELL
+                                new_sl = entry - offset_price
+                                if new_sl < current_sl:
+                                    result = order_manager.modify_position(ticket, sl=new_sl)
+                                    if result.success:
+                                        be_moved_tickets.add(ticket)
+                                        logger.info(
+                                            f"[BE STOP] #{ticket} {symbol} SELL: profit +{pos['profit']:.2f} >= "
+                                            f"trigger +{trigger_usd:.2f} → SL {current_sl} → {new_sl:.5f} (breakeven)"
+                                        )
+
+                # Curata be_moved_tickets pentru pozitii inchise
+                open_tickets = {p["ticket"] for p in open_positions}
+                be_moved_tickets = be_moved_tickets & open_tickets
 
                 # ============================================
                 # PROFIT MANAGER — trailing profit + cycle target
@@ -589,6 +682,10 @@ def main():
                         if isinstance(strategy, TrendFollowing):
                             strategy.set_current_symbol(symbol)
 
+                        # ZoneBasedStrategy: seteaza simbolul pt lookup zone
+                        if isinstance(strategy, ZoneBasedStrategy):
+                            strategy.set_current_symbol(symbol)
+
                         # Analiza
                         signal_result = strategy.analyze(data)
                         if signal_result == Signal.HOLD:
@@ -640,8 +737,21 @@ def main():
                         current_price = sym_info["ask"] if direction == "BUY" else sym_info["bid"]
 
                         # Calcul SL, TP, volume
-                        sl = risk_manager.calculate_stop_loss(data, direction, current_price, symbol)
-                        tp = risk_manager.calculate_take_profit(current_price, sl, direction, symbol)
+                        # NOU 2026-08-03: ZoneBasedStrategy override SL/TP cu zone-specific
+                        sl = None
+                        tp = None
+                        if isinstance(strategy, ZoneBasedStrategy):
+                            zsl, ztp = strategy.get_sl_tp(symbol, direction, current_price)
+                            if zsl is not None and ztp is not None:
+                                sl = zsl
+                                tp = ztp
+                                logger.info(f"[ZoneBased] {symbol} {direction}: SL={sl:.5f} TP={tp:.5f} (zone-based)")
+
+                        if sl is None:
+                            sl = risk_manager.calculate_stop_loss(data, direction, current_price, symbol)
+                        if tp is None:
+                            tp = risk_manager.calculate_take_profit(current_price, sl, direction, symbol)
+
                         sl_pips = abs(current_price - sl) / pips_to_price(symbol, 1)
                         volume = risk_manager.calculate_position_size(
                             account_info["balance"], sl_pips, symbol

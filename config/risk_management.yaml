@@ -72,3 +72,10 @@ limits:
 
   # Kill-switch severe (blow-up prevention)
   max_dd_kill_switch_usd: 300    # -$300 total DD (5.3% cont) → OPRIRE TOTALA bot
+
+  # NOU 2026-08-03: ANTI-CASCADE per simbol
+  # Dupa X losses consecutive pe acelasi simbol → pauza Y ore automat
+  # Motiv: BNBUSD 03.07 a facut 7 SELL cascade -$63 in 9h desi limita era $30
+  # Anti-cascade prinde patternul MAI RAPID decat per-symbol daily loss limit
+  cascade_max_losses: 2          # Dupa 2 losses consecutive pe simbol
+  cascade_pause_hours: 2         # Pauza 2h automat

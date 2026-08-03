@@ -2,6 +2,7 @@
 Modul de Risk Management — dimensionare pozitii, SL/TP, trailing stop, limite zilnice.
 """
 
+import time
 from datetime import date
 
 import pandas as pd
@@ -33,6 +34,10 @@ class RiskManager:
         # NOU 2026-07-01: per-symbol daily loss tracking
         self._daily_pnl_per_symbol: dict[str, float] = {}
         self._daily_symbols_disabled: set[str] = set()
+        # NOU 2026-08-03: anti-cascade — pauza simbol dupa N loss-uri consecutive
+        # Config: limits.cascade_max_losses (default 2), limits.cascade_pause_hours (default 2)
+        self._consecutive_losses_per_symbol: dict[str, int] = {}
+        self._cascade_pause_until: dict[str, float] = {}  # symbol -> unix ts
 
     def _reset_daily_if_needed(self):
         """Reseteaza contoarele zilnice daca s-a schimbat ziua."""
@@ -47,13 +52,37 @@ class RiskManager:
             self._daily_pnl = 0.0
             self._daily_pnl_per_symbol = {}
             self._daily_symbols_disabled = set()
+            # NOU 2026-08-03: NU resetam consecutive_losses la zi noua
+            # (dorim ca o cascada de losses noaptea sa influenteze si dimineata)
+            # dar resetam pauza dupa expirare (see is_symbol_disabled_today)
             self._current_date = today
 
     def is_symbol_disabled_today(self, symbol: str) -> tuple[bool, str]:
-        """Verifica daca un simbol e disabled azi din cauza per-symbol daily loss.
+        """Verifica daca un simbol e disabled azi din cauza per-symbol daily loss
+        SAU din cauza anti-cascade filter.
+
         Returns: (disabled, reason)
         """
         self._reset_daily_if_needed()
+
+        # ═══════════════════════════════════════════════════════════
+        # 1. Anti-cascade check (NOU 2026-08-03)
+        # ═══════════════════════════════════════════════════════════
+        pause_until = self._cascade_pause_until.get(symbol, 0)
+        if pause_until > 0:
+            now = time.time()
+            if now < pause_until:
+                remaining = int((pause_until - now) / 60)
+                return True, f"cascade pause: {remaining} min ramase (dupa {self._consecutive_losses_per_symbol.get(symbol, 0)} losses consecutive)"
+            else:
+                # Pauza expirata — reseteaza
+                logger.info(f"[ANTI-CASCADE] {symbol}: pauza expirata, resetat pentru retry")
+                self._cascade_pause_until.pop(symbol, None)
+                self._consecutive_losses_per_symbol[symbol] = 0
+
+        # ═══════════════════════════════════════════════════════════
+        # 2. Per-symbol daily loss check
+        # ═══════════════════════════════════════════════════════════
         per_sym_limits = self.limits.get("per_symbol_daily_loss_usd", {}) or {}
         if symbol not in per_sym_limits:
             return False, ""
@@ -291,16 +320,36 @@ class RiskManager:
     def record_trade(self, pnl: float, symbol: str = None):
         """Inregistreaza o tranzactie inchisa (PnL si contor).
         NOU 2026-07-01: symbol parameter pentru per-symbol daily tracking.
+        NOU 2026-08-03: anti-cascade — tracks consecutive losses per simbol.
         """
         self._reset_daily_if_needed()
         self._daily_trades += 1
         self._daily_pnl += pnl
         if symbol:
             self._daily_pnl_per_symbol[symbol] = self._daily_pnl_per_symbol.get(symbol, 0.0) + pnl
+
+            # NOU 2026-08-03: anti-cascade tracking (numai la trade-uri REAL inchise, nu pnl=0 open)
+            if pnl < 0:
+                self._consecutive_losses_per_symbol[symbol] = self._consecutive_losses_per_symbol.get(symbol, 0) + 1
+                max_losses = self.limits.get("cascade_max_losses", 2)
+                pause_hours = self.limits.get("cascade_pause_hours", 2)
+                if self._consecutive_losses_per_symbol[symbol] >= max_losses:
+                    self._cascade_pause_until[symbol] = time.time() + (pause_hours * 3600)
+                    logger.warning(
+                        f"[ANTI-CASCADE] {symbol}: {self._consecutive_losses_per_symbol[symbol]} losses consecutive "
+                        f"→ pauza {pause_hours}h automat pe simbol"
+                    )
+            elif pnl > 0:
+                # Win → reset counter losses consecutive
+                if self._consecutive_losses_per_symbol.get(symbol, 0) > 0:
+                    logger.info(f"[ANTI-CASCADE] {symbol}: win → reset counter losses consecutive")
+                self._consecutive_losses_per_symbol[symbol] = 0
+
             logger.info(
                 f"Trade inregistrat: {symbol} PnL={pnl:.2f} | "
                 f"Zilnic: {self._daily_trades} tr, total PnL={self._daily_pnl:.2f}, "
-                f"simbol PnL={self._daily_pnl_per_symbol[symbol]:.2f}"
+                f"simbol PnL={self._daily_pnl_per_symbol[symbol]:.2f} | "
+                f"losses consec {symbol}: {self._consecutive_losses_per_symbol.get(symbol, 0)}"
             )
         else:
             logger.info(f"Trade inregistrat: PnL={pnl:.2f} | Zilnic: {self._daily_trades} tranzactii, PnL={self._daily_pnl:.2f}")
