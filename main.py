@@ -738,18 +738,21 @@ def main():
 
                         # Calcul SL, TP, volume
                         # NOU 2026-08-03: ZoneBasedStrategy override SL/TP cu zone-specific
+                        # FIX 2026-08-05: HARD FAIL daca zone_sl lipseste — nu cade la ATR
+                        # (ATR-based SL a produs 1486 pentru XPDUSD in loc de 1355 zone-based)
                         sl = None
                         tp = None
                         if isinstance(strategy, ZoneBasedStrategy):
                             zsl, ztp = strategy.get_sl_tp(symbol, direction, current_price)
-                            if zsl is not None and ztp is not None:
-                                sl = zsl
-                                tp = ztp
-                                logger.info(f"[ZoneBased] {symbol} {direction}: SL={sl:.5f} TP={tp:.5f} (zone-based)")
-
-                        if sl is None:
+                            if zsl is None or ztp is None:
+                                logger.error(f"[ZoneBased] {symbol} {direction}: SL/TP zone-based LIPSA — SKIP trade")
+                                continue
+                            sl = zsl
+                            tp = ztp
+                            logger.info(f"[ZoneBased] {symbol} {direction}: SL={sl:.5f} TP={tp:.5f} (zone-based)")
+                        else:
+                            # Non-zone_based: calcul default
                             sl = risk_manager.calculate_stop_loss(data, direction, current_price, symbol)
-                        if tp is None:
                             tp = risk_manager.calculate_take_profit(current_price, sl, direction, symbol)
 
                         sl_pips = abs(current_price - sl) / pips_to_price(symbol, 1)
@@ -758,7 +761,10 @@ def main():
                         )
 
                         # Aplica SuperBot size multiplier
-                        if superbot_size_mult != 1.0:
+                        # FIX 2026-08-05: BYPASS SuperBot multiplier pentru ZoneBasedStrategy
+                        # Motiv: SuperBot inmultea lot 1.3x pe TRENDING → amplifica risc
+                        # Zone-based are logica proprie, nu vrea override extern
+                        if superbot_size_mult != 1.0 and not isinstance(strategy, ZoneBasedStrategy):
                             volume = round(volume * superbot_size_mult, 2)
                             # Clamp la limite broker (min 0.01)
                             volume = max(0.01, volume)

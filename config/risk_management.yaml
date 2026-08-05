@@ -51,11 +51,11 @@ trailing_stop:
   trail_pips: 15
 
 limits:
-  # PORTOFOLIU 2026-07-01: 8 simboluri, scalat corespunzator
-  max_open_positions: 8           # 8 simboluri × 1 pozitie fiecare
-  max_positions_per_symbol: 2     # BRENT poate MeanRev H1 + Breakout M30 simultan
-  max_daily_loss_percent: 5.0    # 5% cont ($285 pe $5700) — kill-switch global
-  max_daily_trades: 20            # 8 simboluri × ~2-3 trade/zi mediu
+  # REVERT SAFE 2026-08-05 — dupa cascade 12 trade-uri -$591 pe 04.08
+  max_open_positions: 3           # STRICT (era 8) — max 3 pozitii simultan
+  max_positions_per_symbol: 1     # 1 per simbol (era 2)
+  max_daily_loss_percent: 2.0     # STRICT (era 5%) — daca pierd $130 opresc pentru azi
+  max_daily_trades: 6             # STRICT (era 20) — max 6 trade/zi
   max_correlation_exposure: 3    # Metale corelate (XAU/XAG/XPT/XPD), permit 3 simultan
 
   # NOU 2026-07-01: PER-SIMBOL daily loss limit (izolare per simbol)
