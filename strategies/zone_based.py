@@ -78,18 +78,17 @@ class ZoneBasedStrategy(BaseStrategy):
         rsi = float(last["rsi"])
 
         # ═══════════════════════════════════════════════════════════
-        # 1. BREAKOUT check (highest priority — trend change)
+        # 1. BREAKOUT check (DEZACTIVAT 2026-08-05)
+        # Motivul: SL/TP zone-based bogus pentru pretul breakout
+        # Ex XPTUSD BREAKOUT UP 1776 → BUY cu TP=1640 (mai jos ca entry!)
+        # Necesita implementare dedicata BREAKOUT get_sl_tp — TODO
         # ═══════════════════════════════════════════════════════════
-        breakout_up = zones.get("breakout_up")
-        breakout_down = zones.get("breakout_down")
-
-        if breakout_up is not None and price > float(breakout_up):
-            logger.info(f"[ZoneBased] {symbol}: BREAKOUT UP la {price:.5f} (trigger {breakout_up}) → BUY")
-            return Signal.BUY
-
-        if breakout_down is not None and price < float(breakout_down):
-            logger.info(f"[ZoneBased] {symbol}: BREAKDOWN la {price:.5f} (trigger {breakout_down}) → SELL")
-            return Signal.SELL
+        # breakout_up = zones.get("breakout_up")
+        # breakout_down = zones.get("breakout_down")
+        # if breakout_up is not None and price > float(breakout_up):
+        #     return Signal.BUY
+        # if breakout_down is not None and price < float(breakout_down):
+        #     return Signal.SELL
 
         # ═══════════════════════════════════════════════════════════
         # 2. DEAD ZONE — skip tranzactionare
