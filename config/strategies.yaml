@@ -1,18 +1,57 @@
 # ═══════════════════════════════════════════════════════════════════════
 # Parametri per Strategie
-# Refactor 2026-08-03: zone_based ACTIV pentru 7 simboluri
-# Vechile strategii (breakout, mean_reversion) DEZACTIVATE pentru portofoliul curent
+# Refactor 2026-08-18: adaptive_mtf ACTIV (multi-TF D1+H4+H1)
+# Zone_based DEZACTIVAT — nu detecta trend UP pe XAG (55→65 in 3 sapt)
 # ═══════════════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════════════
-# STRATEGIA PRINCIPALA — ZONE BASED (2026-08-03)
-# Zone tehnice hardcoded per simbol pe baza analiza chart D1+H4
-# 4 metale post-crash BASING (XAG/XAU/XPT/XPD) + 3 recovery TREND (BRENT/WTI/COCOA)
+# STRATEGIA PRINCIPALA — ADAPTIVE MULTI-TIMEFRAME (2026-08-18)
+# Analiza D1 (trend) + H4 (setup) + H1 (timing) — ca un trader real
+# Trade in AMBELE directii bazat pe trend actual (nu contra zonelor vechi)
+# SL/TP dinamic din ATR H4 (nu fix), R:R 2.5
+# ═══════════════════════════════════════════════════════════════════════
+
+adaptive_mtf:
+  enabled: true
+  timeframe: "H1"    # TF principal; strategy fetch D1+H4+H1 intern
+  symbols:
+    - XAGUSD.cfd
+    - XAUUSD.cfd
+    - XPTUSD.cfd
+    - XPDUSD.cfd
+    - BRENT.cfd
+    - WTI.cfd
+    - COCOA.cfd
+
+  # D1 trend detection
+  ema_period_d1: 50
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+
+  # H4 setup + H1 entry
+  rsi_period: 14
+  atr_period: 14
+  atr_sl_mult: 1.5    # SL = pret ± ATR × 1.5
+  tp_rr: 2.5          # TP = SL distance × 2.5 (R:R)
+
+  # RSI thresholds (H1 pt trigger extrem, H4 pt setup moderat)
+  rsi_buy_extreme: 35        # H1 trigger BUY (in trend UP)
+  rsi_sell_extreme: 65       # H1 trigger SELL (in trend DOWN)
+  rsi_buy_moderate: 50       # H4 setup BUY (pullback in trend UP)
+  rsi_sell_moderate: 50      # H4 setup SELL (rally in trend DOWN)
+  rsi_range_extreme_buy: 30  # NEUTRAL bias: range BUY
+  rsi_range_extreme_sell: 70 # NEUTRAL bias: range SELL
+
+# ═══════════════════════════════════════════════════════════════════════
+# ZONE_BASED — DEZACTIVAT 2026-08-18
+# Motiv: zone hardcoded nu se adapteaza la trend evolutiv
+# Ex: XAG rally 55→65 in 3 sapt, bot ramas cu sell zone [60.5-62] vechi
 # ═══════════════════════════════════════════════════════════════════════
 
 zone_based:
-  enabled: true
-  timeframe: "H4"    # H4 pentru toate — filtreaza noise-ul H1/M30
+  enabled: false     # DEZACTIVAT — inlocuit cu adaptive_mtf
+  timeframe: "H4"
   rsi_period: 14
   symbols:
     - XAGUSD.cfd

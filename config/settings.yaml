@@ -28,7 +28,8 @@ symbols:
   - COCOA.cfd         # Cacao (pullback 5700 din rally 6400)
 
 active_strategies:
-  - zone_based       # NOU 2026-08-03 — H4 zone-based ping-pong + trend pullback
+  - adaptive_mtf     # NOU 2026-08-18 — multi-TF D1+H4+H1 adaptiv (trader real)
+  # zone_based DEZACTIVAT — nu detecta trend UP pe XAG 55→65 in 3 sapt
   # breakout, mean_reversion DEZACTIVATE (vezi strategies.yaml)
 
 execution:

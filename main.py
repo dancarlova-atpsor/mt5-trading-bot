@@ -24,6 +24,7 @@ from strategies.news_strategy import NewsSentiment
 from strategies.breakout import Breakout
 from strategies.macd_divergence import MACDDivergence
 from strategies.zone_based import ZoneBasedStrategy
+from strategies.adaptive_mtf import AdaptiveMTFStrategy
 from utils.logger import setup_logger
 from utils.helpers import load_config, is_trading_hours, pips_to_price
 from utils.notifier import TelegramNotifier
@@ -53,6 +54,7 @@ def load_strategies(strategies_config: dict, active_list: list) -> list[dict]:
         "breakout": Breakout,
         "macd_divergence": MACDDivergence,
         "zone_based": ZoneBasedStrategy,
+        "adaptive_mtf": AdaptiveMTFStrategy,
     }
 
     loaded = []
@@ -664,9 +666,20 @@ def main():
                                 logger.debug(f"earnings blackout check error pe {symbol}: {e}")
 
                         # Fetch date
-                        data = data_fetcher.get_rates(symbol, timeframe, bars=500)
-                        if data is None or len(data) < 60:
-                            continue
+                        # NOU 2026-08-18: AdaptiveMTF fetch multi-TF (D1+H4+H1), altfel single TF
+                        if isinstance(strategy, AdaptiveMTFStrategy):
+                            data_d1 = data_fetcher.get_rates(symbol, "D1", bars=200)
+                            data_h4 = data_fetcher.get_rates(symbol, "H4", bars=200)
+                            data_h1 = data_fetcher.get_rates(symbol, "H1", bars=200)
+                            if data_d1 is None or data_h4 is None or data_h1 is None:
+                                continue
+                            if len(data_d1) < 60 or len(data_h4) < 30 or len(data_h1) < 30:
+                                continue
+                            data = data_h1  # pentru compat downstream (SL calc etc)
+                        else:
+                            data = data_fetcher.get_rates(symbol, timeframe, bars=500)
+                            if data is None or len(data) < 60:
+                                continue
 
                         # Scalping: seteaza spread-ul curent
                         if isinstance(strategy, Scalping):
@@ -686,8 +699,17 @@ def main():
                         if isinstance(strategy, ZoneBasedStrategy):
                             strategy.set_current_symbol(symbol)
 
+                        # AdaptiveMTFStrategy: seteaza simbolul pt state intern
+                        if isinstance(strategy, AdaptiveMTFStrategy):
+                            strategy.set_current_symbol(symbol)
+
                         # Analiza
-                        signal_result = strategy.analyze(data)
+                        # NOU 2026-08-18: AdaptiveMTF foloseste analyze_mtf cu 3 TF-uri
+                        if isinstance(strategy, AdaptiveMTFStrategy):
+                            signal_result = strategy.analyze_mtf(data_d1, data_h4, data_h1, symbol)
+                        else:
+                            signal_result = strategy.analyze(data)
+
                         if signal_result == Signal.HOLD:
                             continue
 
@@ -739,19 +761,19 @@ def main():
                         # Calcul SL, TP, volume
                         # NOU 2026-08-03: ZoneBasedStrategy override SL/TP cu zone-specific
                         # FIX 2026-08-05: HARD FAIL daca zone_sl lipseste — nu cade la ATR
-                        # (ATR-based SL a produs 1486 pentru XPDUSD in loc de 1355 zone-based)
+                        # NOU 2026-08-18: AdaptiveMTFStrategy foloseste SL/TP dinamic (ATR H4)
                         sl = None
                         tp = None
-                        if isinstance(strategy, ZoneBasedStrategy):
+                        if isinstance(strategy, (ZoneBasedStrategy, AdaptiveMTFStrategy)):
                             zsl, ztp = strategy.get_sl_tp(symbol, direction, current_price)
                             if zsl is None or ztp is None:
-                                logger.error(f"[ZoneBased] {symbol} {direction}: SL/TP zone-based LIPSA — SKIP trade")
+                                logger.error(f"[{strategy.name}] {symbol} {direction}: SL/TP LIPSA — SKIP trade")
                                 continue
                             sl = zsl
                             tp = ztp
-                            logger.info(f"[ZoneBased] {symbol} {direction}: SL={sl:.5f} TP={tp:.5f} (zone-based)")
+                            logger.info(f"[{strategy.name}] {symbol} {direction}: SL={sl:.5f} TP={tp:.5f}")
                         else:
-                            # Non-zone_based: calcul default
+                            # Non-adaptive: calcul default
                             sl = risk_manager.calculate_stop_loss(data, direction, current_price, symbol)
                             tp = risk_manager.calculate_take_profit(current_price, sl, direction, symbol)
 
@@ -761,12 +783,10 @@ def main():
                         )
 
                         # Aplica SuperBot size multiplier
-                        # FIX 2026-08-05: BYPASS SuperBot multiplier pentru ZoneBasedStrategy
-                        # Motiv: SuperBot inmultea lot 1.3x pe TRENDING → amplifica risc
-                        # Zone-based are logica proprie, nu vrea override extern
-                        if superbot_size_mult != 1.0 and not isinstance(strategy, ZoneBasedStrategy):
+                        # FIX 2026-08-05: BYPASS SuperBot multiplier pentru Zone/AdaptiveMTF
+                        # Motiv: strategiile astea au logica proprie SL/TP + lot fix, nu vrem amplificare externa
+                        if superbot_size_mult != 1.0 and not isinstance(strategy, (ZoneBasedStrategy, AdaptiveMTFStrategy)):
                             volume = round(volume * superbot_size_mult, 2)
-                            # Clamp la limite broker (min 0.01)
                             volume = max(0.01, volume)
 
                         # Executie ordine
