@@ -15,10 +15,12 @@ position_sizing:
   volume_overrides:
     XAGUSD.cfd: 0.01        # Argint — Breakout H1, redus de la 0.02 (BLOW-UP la 0.02 in stress test)
     XAUUSD.cfd: 0.01        # Aur — MeanRev H1, redus preventiv
-    XPTUSD.cfd: 0.02        # Platina — MeanRev M30
-    XPDUSD.cfd: 0.02        # Paladiu — MeanRev M30
-    WTI.cfd:    0.05        # Petrol US — MeanRev M30, redus de la 0.07
-    BRENT.cfd:  0.05        # Petrol UK — MeanRev H1 + Breakout M30, redus de la 0.08
+    # 2026-11-10: risc egalizat — pierderile la SL erau -$80..-$136 pe XPT/XPD/WTI/BRENT
+    # vs -$15..-$20 pe XAG. Un singur SL pe petrol stergea ~10 castiguri.
+    XPTUSD.cfd: 0.01        # Platina — redus de la 0.02
+    XPDUSD.cfd: 0.01        # Paladiu — redus de la 0.02
+    WTI.cfd:    0.02        # Petrol US — redus de la 0.05
+    BRENT.cfd:  0.02        # Petrol UK — redus de la 0.05
     COCOA.cfd:  0.02        # Cacao — Breakout H1
     BNBUSD.cfd: 0.05        # Binance Coin (crypto) — MeanRev M30
 

@@ -397,6 +397,16 @@ def main():
     be_trigger_multiplier = be_config.get("trigger_multiplier", 1.0)  # profit >= sl_dist * mult → move to BE
     be_offset_pips = be_config.get("offset_pips", 0)  # optional: mut SL la entry+offset (lock small profit)
 
+    # NOU 2026-11-10: "let TP run" — strategii ale caror pozitii NU sunt atinse de
+    # BE stop, trailing profit_manager si cycle-close. Iesire DOAR prin SL/TP setat la intrare.
+    # Motiv: 3 luni AdaptiveMTF → castiguri taiate la +$8-20 (trailing), pierderi la SL complet
+    # (-$80..-$136) → net ~0 desi WR > 60%. TP-ul R:R 2.5 nu apuca sa fie atins.
+    let_tp_run = tuple(settings.get("let_tp_run_strategies", ["AdaptiveMTF"]) or ())
+
+    def _is_let_tp_run(pos: dict) -> bool:
+        comment = (pos.get("comment") or "")
+        return bool(let_tp_run) and comment.startswith(let_tp_run)
+
     try:
         while running:
             try:
@@ -516,6 +526,8 @@ def main():
                         ticket = pos["ticket"]
                         if ticket in be_moved_tickets:
                             continue  # Deja mutat la BE
+                        if _is_let_tp_run(pos):
+                            continue  # NOU 2026-11-10: fara BE stop — lasam TP sa fie atins
 
                         entry = pos.get("open_price", 0)
                         current_sl = pos.get("sl", 0)
@@ -569,10 +581,12 @@ def main():
                 # ============================================
                 # PROFIT MANAGER — trailing profit + cycle target
                 # ============================================
-                if open_positions:
-                    total_unrealized = sum(p["profit"] for p in open_positions)
+                # NOU 2026-11-10: pozitiile "let TP run" sunt excluse din cycle-close si trailing
+                managed_positions = [p for p in open_positions if not _is_let_tp_run(p)]
+                if managed_positions:
+                    total_unrealized = sum(p["profit"] for p in managed_positions)
 
-                    # Verificare cycle target — inchide TOATE pozitiile
+                    # Verificare cycle target — inchide pozitiile gestionate (nu si cele let-TP-run)
                     if profit_manager.check_cycle_target(total_unrealized):
                         realized = close_all_positions(order_manager, connector, superbot=superbot, symbol_last_close_time=symbol_last_close_time)
                         profit_manager.record_cycle_close(realized)
@@ -584,7 +598,7 @@ def main():
                         continue
 
                     # Verificare trailing profit per pozitie
-                    for pos in open_positions:
+                    for pos in managed_positions:
                         should_close = profit_manager.check_position_trailing(
                             pos["ticket"], pos["profit"]
                         )

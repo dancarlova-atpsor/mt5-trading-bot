@@ -61,6 +61,12 @@ break_even_stop:
   trigger_multiplier: 1.0    # profit trebuie >= 1× SL distance USD ca sa mut SL la BE
   offset_pips: 0             # 0 = SL exact la entry. >0 = lock small profit (entry + offset)
 
+# NOU 2026-11-10: strategii ale caror pozitii ies DOAR prin SL/TP de la intrare
+# (fara BE stop, fara trailing profit_manager, fara cycle-close).
+# Potrivire dupa comentariul ordinului (= numele strategiei). Lista goala = dezactivat.
+let_tp_run_strategies:
+  - AdaptiveMTF
+
 profit_manager:
   trailing_activation_eur: 40     # Activare trailing la +40 EUR (era 30)
   trailing_percent: 30            # Inchide daca profitul scade 30% din maxim
